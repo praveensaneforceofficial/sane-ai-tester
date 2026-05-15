@@ -65,27 +65,35 @@ io.on('connection', (socket) => {
     });
 
     // Finalize Registration with Nickname
-    socket.on('register-new-worker', async (info) => {
-        try {
-            const { machineId, nickname, ip, os } = info;
-            
-            // Generate unique internal ID (sane-tester-001)
-            const countRes = await pool.query('SELECT COUNT(*) FROM worker_registry');
-            const uniqueId = `sane-tester-${(parseInt(countRes.rows[0].count) + 1).toString().padStart(3, '0')}`;
+   // API Code - inside io.on('connection')
+socket.on('register-new-worker', async (info) => {
+    try {
+        const { machineId, nickname, ip, os } = info;
+        
+        // Generate Unique ID
+        const countRes = await pool.query('SELECT COUNT(*) FROM worker_registry');
+        const uniqueId = `sane-tester-${(parseInt(countRes.rows[0].count) + 1).toString().padStart(3, '0')}`;
 
-            const insertRes = await pool.query(
-                'INSERT INTO worker_registry (worker_id, nickname, machine_id, system_ip, os_platform, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-                [uniqueId, nickname, machineId, ip, os, 'online']
-            );
+        // Insert into DB with status 'online'
+        await pool.query(
+            'INSERT INTO worker_registry (worker_id, nickname, machine_id, system_ip, os_platform, status) VALUES ($1, $2, $3, $4, $5, $6)',
+            [uniqueId, nickname, machineId, ip, os, 'online']
+        );
 
-            const worker = insertRes.rows[0];
-            socket.join(worker.worker_id); // Join dedicated room
-            socket.emit('registered-successfully', worker);
-            io.emit('update-brain'); // Dashboard-ah refresh panna solrom
-        } catch (err) {
-            console.error(err);
-        }
-    });
+        console.log(`✅ New Worker Registered: ${nickname}`);
+        
+        // Join Socket Room
+        socket.join(uniqueId);
+        // Refresh the Brain Dashboard
+        io.emit('update-brain');
+        
+        // Tell the worker they are ready
+        socket.emit('registered-successfully', { worker_id: uniqueId, nickname: nickname });
+
+    } catch (err) {
+        console.error("❌ Registration Error:", err.message);
+    }
+});
 
     // 2. Worker Action: Deactivate / Remove
     socket.on('update-worker-status', async (data) => {
