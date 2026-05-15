@@ -97,19 +97,20 @@ socket.on('register-new-worker', async (info) => {
 
     // 2. Worker Action: Deactivate / Remove
     socket.on('update-worker-status', async (data) => {
-        const { workerId, action } = data; // action: 'active', 'deactive', 'remove'
-        try {
-            if (action === 'remove') {
-                await pool.query('DELETE FROM worker_registry WHERE worker_id = $1', [workerId]);
-            } else {
-                const status = (action === 'active') ? 'online' : 'offline';
-                await pool.query('UPDATE worker_registry SET status = $1 WHERE worker_id = $2', [status, workerId]);
-            }
-            io.emit('update-brain');
-        } catch (err) {
-            console.error(err);
-        }
-    });
+    const { workerId, action } = data;
+    
+    if (action === 'remove') {
+        await pool.query('DELETE FROM worker_registry WHERE worker_id = $1', [workerId]);
+        console.log(`🗑️ Worker ${workerId} deleted from DB.`);
+        io.emit('update-brain'); // Dashboard-la irundhu card disappear aagidum
+        socket.emit('update-brain'); // Worker-ku "Success" message anuppum
+    } else {
+        // Normal online/offline logic
+        const status = (action === 'active') ? 'online' : 'offline';
+        await pool.query('UPDATE worker_registry SET status = $1 WHERE worker_id = $2', [status, workerId]);
+        io.emit('update-brain');
+    }
+});
 
     // 3. Task Management (Brain -> API -> Worker)
     socket.on('send-task-to-worker', async (taskData) => {

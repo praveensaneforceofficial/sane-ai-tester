@@ -22,7 +22,29 @@ async function startWorker() {
     socket.on('registration-status', async (data) => {
         if (data.exists) {
             console.log(`\nIDENTIFIED: ${data.worker.nickname} [${data.worker.worker_id}]`);
-            initAgent(data.worker.worker_id);
+            const choice = await prompts({
+                type: 'select',
+                name: 'action',
+                message: 'Select Action:',
+                choices: [
+                    { title: '🚀 Start Agent (Online)', value: 'connect' },
+                    { title: '🗑️ Remove/Uninstall System', value: 'remove' },
+                    { title: '❌ Exit', value: 'exit' }
+                ]
+            });
+
+            if (choice.action === 'connect') {
+                initAgent(data.worker.worker_id);
+            } else if (choice.action === 'remove') {
+                console.log("Removing system from registry...");
+                socket.emit('update-worker-status', { 
+                    workerId: data.worker.worker_id, 
+                    action: 'remove' 
+                });
+                // Inga uninstallation logic (like deleting config files) add pannikalam
+            } else {
+                process.exit();
+            }
         } else {
             const response = await prompts({
                 type: 'text',
