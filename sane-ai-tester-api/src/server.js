@@ -60,12 +60,12 @@ process.on('SIGINT', () => {
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
     console.log(`
-╔═══════════════════════════════════════════════════════════════╗
-║     🧠 SANE-AI CENTRAL API SERVER                            ║
-║     🚀 Running on port: ${PORT}                                 ║
+╔════════════════════════════════════════════════════════════════╗
+║     🧠 SANE-AI CENTRAL API SERVER                              ║
+║     🚀 Running on port: ${PORT}                                ║
 ║     📡 WebSocket: ws://localhost:${PORT}                       ║
 ║     🔗 REST API: http://localhost:${PORT}/api                  ║
 ║     ⏰ Auto-offline: 60 seconds timeout                        ║
-╚═══════════════════════════════════════════════════════════════╝
+╚════════════════════════════════════════════════════════════════╝
     `);
 });
