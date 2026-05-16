@@ -1,8 +1,8 @@
 {
 	"info": {
-		"_postman_id": "sane-ai-tester-exhaustive-collection",
-		"name": "Sane AI Tester API (Complete)",
-		"description": "Exhaustive collection for testing every single API endpoint of Sane AI Tester Central API",
+		"_postman_id": "sane-ai-tester-descriptive-collection",
+		"name": "Sane AI Tester API (with Samples)",
+		"description": "Exhaustive collection with detailed sample parameters and request bodies for all Sane AI Tester APIs.",
 		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
 	},
 	"item": [
@@ -12,9 +12,44 @@
 				{ "name": "Get All Workers", "request": { "method": "GET", "url": "{{baseUrl}}/api/workers" } },
 				{ "name": "Get Online Workers", "request": { "method": "GET", "url": "{{baseUrl}}/api/workers/online" } },
 				{ "name": "Get Worker By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/workers/:workerId", "variable": [{"key": "workerId", "value": "sane-tester-001"}] } },
-				{ "name": "Register Worker", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"machineId\": \"mac-001\",\n    \"nickname\": \"Alpha-Worker\",\n    \"ip\": \"127.0.0.1\",\n    \"os\": \"Windows 11\"\n}" }, "url": "{{baseUrl}}/api/workers/register" } },
-				{ "name": "Update Status", "request": { "method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"action\": \"active\"\n}" }, "url": "{{baseUrl}}/api/workers/:workerId/status", "variable": [{"key": "workerId", "value": "sane-tester-001"}] } },
-				{ "name": "Update Details", "request": { "method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"nickname\": \"Updated-Worker\"\n}" }, "url": "{{baseUrl}}/api/workers/:workerId", "variable": [{"key": "workerId", "value": "sane-tester-001"}] } },
+				{ 
+					"name": "Register Worker", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"machineId\": \"mac-12345\",\n    \"nickname\": \"Central-Worker-Node\",\n    \"ip\": \"192.168.1.15\",\n    \"os\": \"Windows 11 Pro\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/workers/register" 
+					} 
+				},
+				{ 
+					"name": "Update Status", 
+					"request": { 
+						"method": "PUT", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"action\": \"active\" \n    // Options: 'active' (mark online), 'offline' (mark offline), 'remove' (delete)\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/workers/:workerId/status", 
+						"variable": [{"key": "workerId", "value": "sane-tester-001"}] 
+					} 
+				},
+				{ 
+					"name": "Update Details", 
+					"request": { 
+						"method": "PUT", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"nickname\": \"Master-Worker-Refined\",\n    \"workerType\": \"cloud_instance\",\n    \"version\": \"v2.0.1\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/workers/:workerId", 
+						"variable": [{"key": "workerId", "value": "sane-tester-001"}] 
+					} 
+				},
 				{ "name": "Delete Worker", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/workers/:workerId", "variable": [{"key": "workerId", "value": "sane-tester-001"}] } },
 				{ "name": "Get Heartbeats", "request": { "method": "GET", "url": "{{baseUrl}}/api/workers/:workerId/heartbeat", "variable": [{"key": "workerId", "value": "sane-tester-001"}] } }
 			]
@@ -24,67 +59,206 @@
 			"item": [
 				{ "name": "Get All Tasks", "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks" } },
 				{ "name": "Get Task By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/:taskId", "variable": [{"key": "taskId", "value": "task-101"}] } },
-				{ "name": "Create Task", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"task_id\": \"task-101\",\n    \"prompt\": \"Test homepage\",\n    \"url\": \"https://example.com\",\n    \"priority\": \"high\"\n}" }, "url": "{{baseUrl}}/api/tasks" } },
-				{ "name": "Update Status", "request": { "method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"status\": \"completed\"\n}" }, "url": "{{baseUrl}}/api/tasks/:taskId/status", "variable": [{"key": "taskId", "value": "task-101"}] } },
-				{ "name": "Assign Task", "request": { "method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"workerId\": \"sane-tester-001\"\n}" }, "url": "{{baseUrl}}/api/tasks/:taskId/assign", "variable": [{"key": "taskId", "value": "task-101"}] } },
-				{ "name": "Retry Task", "request": { "method": "POST", "url": "{{baseUrl}}/api/tasks/:taskId/retry", "variable": [{"key": "taskId", "value": "task-101"}] } },
-				{ "name": "Cancel Task", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/tasks/:taskId", "variable": [{"key": "taskId", "value": "task-101"}] } },
+				{ 
+					"name": "Create Task", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"task_id\": \"task-ui-001\",\n    \"worker_id\": \"sane-tester-001\",\n    \"prompt\": \"Test the checkout flow with invalid credit card\",\n    \"url\": \"https://example-shop.com/checkout\",\n    \"priority\": \"high\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/tasks" 
+					} 
+				},
+				{ 
+					"name": "Update Status", 
+					"request": { 
+						"method": "PUT", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"status\": \"failed\",\n    \"error\": \"Element #checkout-btn not found after 30s timeout\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/tasks/:taskId/status", 
+						"variable": [{"key": "taskId", "value": "task-ui-001"}] 
+					} 
+				},
+				{ 
+					"name": "Assign Task", 
+					"request": { 
+						"method": "PUT", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"workerId\": \"sane-tester-002\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/tasks/:taskId/assign", 
+						"variable": [{"key": "taskId", "value": "task-ui-001"}] 
+					} 
+				},
+				{ "name": "Retry Task", "request": { "method": "POST", "url": "{{baseUrl}}/api/tasks/:taskId/retry", "variable": [{"key": "taskId", "value": "task-ui-001"}] } },
+				{ "name": "Cancel Task", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/tasks/:taskId", "variable": [{"key": "taskId", "value": "task-ui-001"}] } },
 				{ "name": "Get By Worker", "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/worker/:workerId", "variable": [{"key": "workerId", "value": "sane-tester-001"}] } },
 				{ "name": "Get By Status", "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/status/:status", "variable": [{"key": "status", "value": "pending"}] } },
-				{ "name": "Add Action", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"step_number\": 1,\n    \"action_type\": \"click\",\n    \"selector\": \"#btn\",\n    \"success\": true\n}" }, "url": "{{baseUrl}}/api/tasks/:taskId/actions", "variable": [{"key": "taskId", "value": "task-101"}] } },
-				{ "name": "Get Actions", "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/:taskId/actions", "variable": [{"key": "taskId", "value": "task-101"}] } }
+				{ 
+					"name": "Add Action (Step)", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"step_number\": 1,\n    \"action_type\": \"type\",\n    \"selector\": \"input[name='cc-number']\",\n    \"value\": \"4111 1111 1111 1111\",\n    \"success\": true,\n    \"screenshot_path\": \"/storage/tasks/task-ui-001/step1.png\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/tasks/:taskId/actions", 
+						"variable": [{"key": "taskId", "value": "task-ui-001"}] 
+					} 
+				},
+				{ "name": "Get Actions", "request": { "method": "GET", "url": "{{baseUrl}}/api/tasks/:taskId/actions", "variable": [{"key": "taskId", "value": "task-ui-001"}] } }
 			]
 		},
 		{
 			"name": "3. Project Management",
 			"item": [
 				{ "name": "Get All Projects", "request": { "method": "GET", "url": "{{baseUrl}}/api/projects" } },
-				{ "name": "Create Project", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"project_jobj_id\": \"proj-001\",\n    \"project_name\": \"My Project\"\n}" }, "url": "{{baseUrl}}/api/projects" } },
+				{ 
+					"name": "Create Project", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"project_jobj_id\": \"Z-PROJ-888\",\n    \"project_name\": \"Internal ERP System\",\n    \"category\": \"custom\",\n    \"test_type\": \"Security\",\n    \"description\": \"Comprehensive security audit of the ERP\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/projects" 
+					} 
+				},
 				{ "name": "Get Active Projects", "request": { "method": "GET", "url": "{{baseUrl}}/api/projects/active" } },
 				{ "name": "Sync Zoho", "request": { "method": "POST", "url": "{{baseUrl}}/api/projects/sync" } },
 				{ "name": "Get By Category", "request": { "method": "GET", "url": "{{baseUrl}}/api/projects/category/:category", "variable": [{"key": "category", "value": "zohosprint"}] } },
-				{ "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/projects/:projectJobjId", "variable": [{"key": "projectJobjId", "value": "proj-001"}] } },
-				{ "name": "Update Project", "request": { "method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"description\": \"Updated description\"\n}" }, "url": "{{baseUrl}}/api/projects/:projectJobjId", "variable": [{"key": "projectJobjId", "value": "proj-001"}] } },
-				{ "name": "Delete Project", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/projects/:projectJobjId", "variable": [{"key": "projectJobjId", "value": "proj-001"}] } }
+				{ "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/projects/:projectJobjId", "variable": [{"key": "projectJobjId", "value": "Z-PROJ-888"}] } },
+				{ 
+					"name": "Update Project", 
+					"request": { 
+						"method": "PUT", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"active_flag\": false,\n    \"description\": \"Project archived after completion\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/projects/:projectJobjId", 
+						"variable": [{"key": "projectJobjId", "value": "Z-PROJ-888"}] 
+					} 
+				},
+				{ "name": "Delete Project", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/projects/:projectJobjId", "variable": [{"key": "projectJobjId", "value": "Z-PROJ-888"}] } }
 			]
 		},
 		{
 			"name": "4. Ticket Management",
 			"item": [
 				{ "name": "Get All Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/api/tickets" } },
-				{ "name": "Create Ticket", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"ticket_id\": \"TIC-001\",\n    \"project_jobj_id\": \"proj-001\",\n    \"title\": \"Login failure\"\n}" }, "url": "{{baseUrl}}/api/tickets" } },
+				{ 
+					"name": "Create Ticket", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"ticket_id\": \"Z-TIC-55\",\n    \"project_jobj_id\": \"Z-PROJ-888\",\n    \"title\": \"Broken CSS on Login Page\",\n    \"priority\": \"Medium\",\n    \"severity\": \"Minor\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/tickets" 
+					} 
+				},
 				{ "name": "Get AI Testing Tickets", "request": { "method": "GET", "url": "{{baseUrl}}/api/tickets/ai-testing" } },
-				{ "name": "Get By Project", "request": { "method": "GET", "url": "{{baseUrl}}/api/tickets/project/:projectJobjId", "variable": [{"key": "projectJobjId", "value": "proj-001"}] } },
-				{ "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/tickets/:ticketId", "variable": [{"key": "ticketId", "value": "TIC-001"}] } },
-				{ "name": "Update Ticket", "request": { "method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"status\": \"In Progress\"\n}" }, "url": "{{baseUrl}}/api/tickets/:ticketId", "variable": [{"key": "ticketId", "value": "TIC-001"}] } },
-				{ "name": "Update AI Status", "request": { "method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"status\": \"testing_started\"\n}" }, "url": "{{baseUrl}}/api/tickets/:ticketId/ai-status", "variable": [{"key": "ticketId", "value": "TIC-001"}] } },
-				{ "name": "Get Comments", "request": { "method": "GET", "url": "{{baseUrl}}/api/tickets/:ticketId/comments", "variable": [{"key": "ticketId", "value": "TIC-001"}] } },
-				{ "name": "Add Comment", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"comment_text\": \"Working on it\"\n}" }, "url": "{{baseUrl}}/api/tickets/:ticketId/comments", "variable": [{"key": "ticketId", "value": "TIC-001"}] } }
+				{ "name": "Get By Project", "request": { "method": "GET", "url": "{{baseUrl}}/api/tickets/project/:projectJobjId", "variable": [{"key": "projectJobjId", "value": "Z-PROJ-888"}] } },
+				{ "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/tickets/:ticketId", "variable": [{"key": "ticketId", "value": "Z-TIC-55"}] } },
+				{ 
+					"name": "Update Ticket", 
+					"request": { 
+						"method": "PUT", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"status\": \"Closed\",\n    \"assigned_to\": \"AI-Worker-001\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/tickets/:ticketId", 
+						"variable": [{"key": "ticketId", "value": "Z-TIC-55"}] 
+					} 
+				},
+				{ 
+					"name": "Update AI Status", 
+					"request": { 
+						"method": "PUT", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"status\": \"failed_and_retrying\",\n    \"task_id\": \"task-ui-001\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/tickets/:ticketId/ai-status", 
+						"variable": [{"key": "ticketId", "value": "Z-TIC-55"}] 
+					} 
+				},
+				{ "name": "Get Comments", "request": { "method": "GET", "url": "{{baseUrl}}/api/tickets/:ticketId/comments", "variable": [{"key": "ticketId", "value": "Z-TIC-55"}] } },
+				{ 
+					"name": "Add Comment", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"commenter_name\": \"System-Watcher\",\n    \"comment_text\": \"AI has detected an anomaly in the layout.\",\n    \"is_ai_generated\": true\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/tickets/:ticketId/comments", 
+						"variable": [{"key": "ticketId", "value": "Z-TIC-55"}] 
+					} 
+				}
 			]
 		},
 		{
 			"name": "5. Test Reports",
 			"item": [
 				{ "name": "Get All Reports", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports" } },
-				{ "name": "Generate Report", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"report_id\": \"REP-001\",\n    \"task_id\": \"task-101\",\n    \"success_rate\": 100\n}" }, "url": "{{baseUrl}}/api/reports" } },
-				{ "name": "Get By Task", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/task/:taskId", "variable": [{"key": "taskId", "value": "task-101"}] } },
+				{ 
+					"name": "Generate Report", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"report_id\": \"REP-MASTER-01\",\n    \"task_id\": \"task-ui-001\",\n    \"worker_id\": \"sane-tester-001\",\n    \"project_name\": \"Internal ERP\",\n    \"total_tests\": 100,\n    \"passed_tests\": 95,\n    \"failed_tests\": 5,\n    \"success_rate\": 95.0,\n    \"summary\": \"Overall good, but 5 UI regressions found.\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/reports" 
+					} 
+				},
+				{ "name": "Get By Task", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/task/:taskId", "variable": [{"key": "taskId", "value": "task-ui-001"}] } },
 				{ "name": "Get By Worker", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/worker/:workerId", "variable": [{"key": "workerId", "value": "sane-tester-001"}] } },
-				{ "name": "Get By Project", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/project/:projectName", "variable": [{"key": "projectName", "value": "My Project"}] } },
-				{ "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/:reportId", "variable": [{"key": "reportId", "value": "REP-001"}] } },
-				{ "name": "Delete Report", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/reports/:reportId", "variable": [{"key": "reportId", "value": "REP-001"}] } },
-				{ "name": "Download Report", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/:reportId/download", "variable": [{"key": "reportId", "value": "REP-001"}] } }
+				{ "name": "Get By Project", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/project/:projectName", "variable": [{"key": "projectName", "value": "Internal ERP"}] } },
+				{ "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/:reportId", "variable": [{"key": "reportId", "value": "REP-MASTER-01"}] } },
+				{ "name": "Delete Report", "request": { "method": "DELETE", "url": "{{baseUrl}}/api/reports/:reportId", "variable": [{"key": "reportId", "value": "REP-MASTER-01"}] } },
+				{ "name": "Download Report", "request": { "method": "GET", "url": "{{baseUrl}}/api/reports/:reportId/download", "variable": [{"key": "reportId", "value": "REP-MASTER-01"}] } }
 			]
 		},
 		{
 			"name": "6. Error Logs",
 			"item": [
 				{ "name": "Get All Errors", "request": { "method": "GET", "url": "{{baseUrl}}/api/errors" } },
-				{ "name": "Create Error", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"error_id\": \"ERR-001\",\n    \"task_id\": \"task-101\",\n    \"error_message\": \"Timeout\"\n}" }, "url": "{{baseUrl}}/api/errors" } },
-				{ "name": "Get By Task", "request": { "method": "GET", "url": "{{baseUrl}}/api/errors/task/:taskId", "variable": [{"key": "taskId", "value": "task-101"}] } },
+				{ 
+					"name": "Create Error", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"error_id\": \"ERR-555\",\n    \"task_id\": \"task-ui-001\",\n    \"error_type\": \"ReferenceError\",\n    \"error_message\": \"variable X is not defined\",\n    \"severity\": \"High\",\n    \"ai_analysis\": \"Likely a missing export in the source code.\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/errors" 
+					} 
+				},
+				{ "name": "Get By Task", "request": { "method": "GET", "url": "{{baseUrl}}/api/errors/task/:taskId", "variable": [{"key": "taskId", "value": "task-ui-001"}] } },
 				{ "name": "Get By Worker", "request": { "method": "GET", "url": "{{baseUrl}}/api/errors/worker/:workerId", "variable": [{"key": "workerId", "value": "sane-tester-001"}] } },
-				{ "name": "Get By Severity", "request": { "method": "GET", "url": "{{baseUrl}}/api/errors/severity/:severity", "variable": [{"key": "severity", "value": "high"}] } },
-				{ "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/errors/:errorId", "variable": [{"key": "errorId", "value": "ERR-001"}] } },
-				{ "name": "Resolve Error", "request": { "method": "PUT", "url": "{{baseUrl}}/api/errors/:errorId/resolve", "variable": [{"key": "errorId", "value": "ERR-001"}] } }
+				{ "name": "Get By Severity", "request": { "method": "GET", "url": "{{baseUrl}}/api/errors/severity/:severity", "variable": [{"key": "severity", "value": "High"}] } },
+				{ "name": "Get By ID", "request": { "method": "GET", "url": "{{baseUrl}}/api/errors/:errorId", "variable": [{"key": "errorId", "value": "ERR-555"}] } },
+				{ "name": "Resolve Error", "request": { "method": "PUT", "url": "{{baseUrl}}/api/errors/:errorId/resolve", "variable": [{"key": "errorId", "value": "ERR-555"}] } }
 			]
 		},
 		{
@@ -102,7 +276,18 @@
 			"name": "8. AI Usage",
 			"item": [
 				{ "name": "Get All Usage", "request": { "method": "GET", "url": "{{baseUrl}}/api/ai-usage" } },
-				{ "name": "Log Usage", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"api_type\": \"gpt-4\",\n    \"tokens_used\": 100\n}" }, "url": "{{baseUrl}}/api/ai-usage" } },
+				{ 
+					"name": "Log Usage", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"usage_id\": \"USE-123\",\n    \"api_type\": \"GPT-4o\",\n    \"tokens_used\": 250,\n    \"source\": \"worker\",\n    \"source_id\": \"sane-tester-001\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/ai-usage" 
+					} 
+				},
 				{ "name": "Usage Summary", "request": { "method": "GET", "url": "{{baseUrl}}/api/ai-usage/summary" } },
 				{ "name": "Token Stats", "request": { "method": "GET", "url": "{{baseUrl}}/api/ai-usage/tokens" } },
 				{ "name": "Get By Source", "request": { "method": "GET", "url": "{{baseUrl}}/api/ai-usage/source/:source", "variable": [{"key": "source", "value": "worker"}] } }
@@ -112,9 +297,32 @@
 			"name": "9. Configuration",
 			"item": [
 				{ "name": "Get All Configs", "request": { "method": "GET", "url": "{{baseUrl}}/api/config" } },
-				{ "name": "Create Config", "request": { "method": "POST", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"config_key\": \"max_retries\",\n    \"config_value\": \"3\"\n}" }, "url": "{{baseUrl}}/api/config" } },
-				{ "name": "Get By Key", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/:key", "variable": [{"key": "key", "value": "max_retries"}] } },
-				{ "name": "Update Config", "request": { "method": "PUT", "header": [{"key": "Content-Type", "value": "application/json"}], "body": { "mode": "raw", "raw": "{\n    \"config_value\": \"5\"\n}" }, "url": "{{baseUrl}}/api/config/:key", "variable": [{"key": "key", "value": "max_retries"}] } }
+				{ 
+					"name": "Create Config", 
+					"request": { 
+						"method": "POST", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"config_key\": \"ai_testing_interval\",\n    \"config_value\": \"3600\",\n    \"config_type\": \"number\",\n    \"description\": \"Interval in seconds for AI automated tests\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/config" 
+					} 
+				},
+				{ "name": "Get By Key", "request": { "method": "GET", "url": "{{baseUrl}}/api/config/:key", "variable": [{"key": "key", "value": "ai_testing_interval"}] } },
+				{ 
+					"name": "Update Config", 
+					"request": { 
+						"method": "PUT", 
+						"header": [{"key": "Content-Type", "value": "application/json"}], 
+						"body": { 
+							"mode": "raw", 
+							"raw": "{\n    \"config_value\": \"7200\",\n    \"updated_by\": \"admin-user\"\n}" 
+						}, 
+						"url": "{{baseUrl}}/api/config/:key", 
+						"variable": [{"key": "key", "value": "ai_testing_interval"}] 
+					} 
+				}
 			]
 		},
 		{
