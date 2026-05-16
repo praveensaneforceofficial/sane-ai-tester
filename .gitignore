@@ -134,3 +134,80 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+
+# sane-ai-tester-brain
+# Logs
+sane-ai-tester-brain/logs/
+sane-ai-tester-brain/*.log
+sane-ai-tester-brain/*.log.gz
+sane-ai-tester-brain/*.log.zip
+
+# Data
+sane-ai-tester-brain/data/vector_db/
+sane-ai-tester-brain/data/reports/
+sane-ai-tester-brain/data/screenshots/
+sane-ai-tester-brain/data/*.db
+sane-ai-tester-brain/data/*.sqlite
+sane-ai-tester-brain/data/*.sqlite3
+
+# Environment
+sane-ai-tester-brain/.env
+sane-ai-tester-brain/.env.local
+sane-ai-tester-brain/.env.*.local
+sane-ai-tester-brain/.env.production
+sane-ai-tester-brain/.env.staging
+
+# Dashboard
+sane-ai-tester-brain/dashboard/node_modules/
+sane-ai-tester-brain/dashboard/dist/
+sane-ai-tester-brain/dashboard/.vite/
+sane-ai-tester-brain/dashboard/build/
+sane-ai-tester-brain/dashboard/.cache/
+sane-ai-tester-brain/dashboard/coverage/
+sane-ai-tester-brain/dashboard/.env.local
+
+# Temporary
+sane-ai-tester-brain/tmp/
+sane-ai-tester-brain/temp/
+
+# Runtime
+sane-ai-tester-brain/runtime/
+sane-ai-tester-brain/sessions/
+
+# AI Models
+sane-ai-tester-brain/models/
+sane-ai-tester-brain/checkpoints/
+sane-ai-tester-brain/chroma/
+sane-ai-tester-brain/chromadb/
+
+# Uploads & Reports
+sane-ai-tester-brain/uploads/
+sane-ai-tester-brain/reports/
+
+# Playwright / Browser
+sane-ai-tester-brain/playwright-report/
+sane-ai-tester-brain/test-results/
+sane-ai-tester-brain/browser_data/
+sane-ai-tester-brain/chrome_profile/
+
+# Secrets
+sane-ai-tester-brain/secrets/
+sane-ai-tester-brain/keys/
+sane-ai-tester-brain/*.pem
+sane-ai-tester-brain/*.key
+sane-ai-tester-brain/*.crt
+sane-ai-tester-brain/*.p12
+sane-ai-tester-brain/service-account.json
+
+# Cache
+sane-ai-tester-brain/.ruff_cache/
+sane-ai-tester-brain/.mypy_cache/
+sane-ai-tester-brain/.pytest_cache/
+sane-ai-tester-brain/.cache/
+
+# Build
+sane-ai-tester-brain/dist/
+sane-ai-tester-brain/build/
+
+
