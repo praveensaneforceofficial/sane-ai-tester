@@ -4,7 +4,6 @@ from contextlib import asynccontextmanager
 import os
 from config.settings import settings
 from utils.logger import get_logger
-from routes import dashboard, workers, tasks, analytics, reports, health
 from services.apiBridgeService import api_bridge_service
 from services.schedulerService import start_scheduler
 
@@ -14,7 +13,7 @@ logger = get_logger(__name__)
 async def lifespan(app: FastAPI):
     """Handle startup and shutdown events"""
     # Startup
-    logger.info("🚀 Starting Sane-AI Brain...")
+    logger.info("Starting Sane-AI Brain...")
     
     # Initialize API Bridge connection
     await api_bridge_service.initialize()
@@ -28,14 +27,14 @@ async def lifespan(app: FastAPI):
     os.makedirs(os.path.dirname(settings.CHROMA_DB_PATH), exist_ok=True)
     os.makedirs(os.path.dirname(settings.LOG_FILE), exist_ok=True)
     
-    logger.info(f"✅ Brain started on http://{settings.BRAIN_HOST}:{settings.BRAIN_PORT}")
+    logger.info(f"Brain started on http://{settings.BRAIN_HOST}:{settings.BRAIN_PORT}")
     
     yield
     
     # Shutdown
-    logger.info("🛑 Shutting down Sane-AI Brain...")
+    logger.info("Shutting down Sane-AI Brain...")
     await api_bridge_service.close()
-    logger.info("✅ Shutdown complete")
+    logger.info("Shutdown complete")
 
 # Create FastAPI app
 app = FastAPI(
@@ -55,6 +54,7 @@ app.add_middleware(
 )
 
 # Include routers
+from routes import dashboard as dashboard_router
 from routes import auth as auth_router
 from routes import workers as workers_router
 from routes import tasks as tasks_router
@@ -62,6 +62,7 @@ from routes import analytics as analytics_router
 from routes import reports as reports_router
 from routes import health as health_router
 
+app.include_router(dashboard_router.router, prefix="/api", tags=["Dashboard"])
 app.include_router(auth_router.router, prefix="/api", tags=["Auth"])
 app.include_router(workers_router.router, prefix="/api", tags=["Workers"])
 app.include_router(tasks_router.router, prefix="/api", tags=["Tasks"])

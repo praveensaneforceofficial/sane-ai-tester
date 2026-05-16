@@ -1,40 +1,33 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from ai.llm.openai_client import openai_client
 from ai.llm.ollama_client import ollama_client
-from ai.rag.retriever import rag_retriever
 from ai.agents.testPlanner import test_planner
 from ai.agents.bugAnalyzer import bug_analyzer
-from config.ai_config import AIConfig
+from config.settings import settings
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 class AIOrchestratorService:
-    """Orchestrate AI operations"""
+    """Orchestrate AI operations using chat_completion standard"""
     
     async def generate_test_prompt(self, url: str) -> str:
         """Generate test prompt using AI"""
         try:
-            # Get similar test cases from RAG
-            similar = await rag_retriever.retrieve_similar_test_cases(url, limit=3)
+            prompt = f"You are a Senior QA Engineer. Generate a comprehensive test execution plan for the following URL: {url}. Provide a numbered list of steps."
             
-            context = ""
-            if similar:
-                context = f"\nSimilar test cases:\n"
-                for s in similar:
-                    context += f"- {s.get('metadata', {}).get('name', 'Unknown')}\n"
+            messages = [
+                {"role": "system", "content": "You are a QA automation expert."},
+                {"role": "user", "content": prompt}
+            ]
             
-            prompt = f"Generate comprehensive test cases for URL: {url}{context}"
-            
-            if AIConfig.USE_OPENAI:
-                response = await openai_client.chat_completion([
-                    {"role": "system", "content": "You are a QA engineer generating test cases."},
-                    {"role": "user", "content": prompt}
-                ])
+            # Prefer OpenAI if key exists, else fallback to Ollama
+            if settings.OPENAI_API_KEY:
+                response = await openai_client.chat_completion(messages)
             else:
-                response = await ollama_client.generate(prompt)
+                response = await ollama_client.chat_completion(messages)
             
-            return response or f"Test the following URL: {url}"
+            return response or f"Perform full functional testing on {url}"
             
         except Exception as e:
             logger.error(f"Failed to generate test prompt: {e}")

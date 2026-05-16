@@ -46,9 +46,9 @@ class AIConfig:
             logger.warning("No AI provider configured. AI features will be disabled.")
             return False
         elif cls.USE_OPENAI:
-            logger.info(f"✅ AI Provider: OpenAI (Model: {cls.get_model_name()})")
+            logger.info(f"AI Provider: OpenAI (Model: {cls.get_model_name()})")
         elif cls.USE_OLLAMA:
-            logger.info(f"✅ AI Provider: Ollama (Model: {cls.get_model_name()})")
+            logger.info(f"AI Provider: Ollama (Model: {cls.get_model_name()})")
         return True
 
 # Validate on import
