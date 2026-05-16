@@ -229,3 +229,198 @@ INSERT INTO system_config (config_key, config_value, config_type, description) V
 ('max_concurrent_tasks', '5', 'number', 'Maximum concurrent tasks per worker'),
 ('record_video_default', 'true', 'boolean', 'Record video by default'),
 ('ai_model', 'ollama', 'string', 'AI model to use: openai or ollama');
+
+
+13. zoho_projects - Zoho Projects Management
+sql
+CREATE TABLE zoho_projects (
+    id SERIAL PRIMARY KEY,
+    project_jobj_id VARCHAR(100) UNIQUE NOT NULL,    -- 29601000000015012
+    project_name VARCHAR(500) NOT NULL,               -- Pharma DotNetWeb
+    category VARCHAR(50) DEFAULT 'zohosprint',       -- custom, zohosprint
+    test_type VARCHAR(50),                            -- web, mobile, both
+    mobile_platform VARCHAR(50),                      -- ios, android, both (if mobile)
+    description TEXT,
+    created_date TIMESTAMP DEFAULT NOW(),
+    active_flag BOOLEAN DEFAULT TRUE,
+    deactivated_date TIMESTAMP,
+    last_synced_at TIMESTAMP,
+    metadata JSONB,                                   -- Additional project data
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_zoho_projects_jobj_id ON zoho_projects(project_jobj_id);
+CREATE INDEX idx_zoho_projects_name ON zoho_projects(project_name);
+CREATE INDEX idx_zoho_projects_active_flag ON zoho_projects(active_flag);
+CREATE INDEX idx_zoho_projects_category ON zoho_projects(category);
+14. zoho_tickets - Zoho Sprint Tickets/Issues
+sql
+CREATE TABLE zoho_tickets (
+    id SERIAL PRIMARY KEY,
+    ticket_id VARCHAR(100) UNIQUE NOT NULL,          -- Zoho ticket ID
+    project_jobj_id VARCHAR(100) REFERENCES zoho_projects(project_jobj_id) ON DELETE CASCADE,
+    sprint_id VARCHAR(100),                          -- Zoho sprint ID
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    status VARCHAR(50),                              -- open, in_progress, testing, closed
+    priority VARCHAR(20),                            -- high, medium, low
+    severity VARCHAR(20),                            -- critical, major, minor
+    ticket_type VARCHAR(50),                         -- bug, feature, task, test_case
+    assigned_to VARCHAR(100),                        -- Assigned person email/name
+    reporter VARCHAR(100),                           -- Who reported
+    comments_count INT DEFAULT 0,
+    attachments_count INT DEFAULT 0,
+    is_ai_testing BOOLEAN DEFAULT FALSE,             -- Marked for AI testing
+    ai_testing_status VARCHAR(50),                   -- pending, in_progress, completed, failed
+    task_id VARCHAR(50) REFERENCES tasks(task_id) ON DELETE SET NULL,
+    custom_fields JSONB,                             -- Any custom fields from Zoho
+    zoho_data JSONB,                                 -- Raw Zoho data
+    created_time TIMESTAMP,
+    modified_time TIMESTAMP,
+    closed_time TIMESTAMP,
+    synced_at TIMESTAMP DEFAULT NOW(),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_zoho_tickets_ticket_id ON zoho_tickets(ticket_id);
+CREATE INDEX idx_zoho_tickets_project ON zoho_tickets(project_jobj_id);
+CREATE INDEX idx_zoho_tickets_status ON zoho_tickets(status);
+CREATE INDEX idx_zoho_tickets_ai_testing ON zoho_tickets(is_ai_testing);
+CREATE INDEX idx_zoho_tickets_task_id ON zoho_tickets(task_id);
+15. ticket_comments - Ticket Comments & AI Interactions
+sql
+CREATE TABLE ticket_comments (
+    id SERIAL PRIMARY KEY,
+    comment_id VARCHAR(100) UNIQUE NOT NULL,
+    ticket_id VARCHAR(100) REFERENCES zoho_tickets(ticket_id) ON DELETE CASCADE,
+    commenter_type VARCHAR(50),                      -- human, brain_ai, worker_ai, system
+    commenter_name VARCHAR(100),                     -- Name or Agent ID
+    comment_text TEXT,
+    is_ai_generated BOOLEAN DEFAULT FALSE,
+    ai_model_used VARCHAR(50),                       -- gpt-4, llama3, etc.
+    tokens_used INT,                                 -- Tokens consumed for this comment
+    response_time INT,                               -- ms
+    parent_comment_id VARCHAR(100),                  -- For thread replies
+    metadata JSONB,                                  -- Additional data
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_ticket_comments_ticket_id ON ticket_comments(ticket_id);
+CREATE INDEX idx_ticket_comments_commenter ON ticket_comments(commenter_type);
+CREATE INDEX idx_ticket_comments_created_at ON ticket_comments(created_at);
+16. ai_api_usage - API Token Usage Tracking
+sql
+CREATE TABLE ai_api_usage (
+    id SERIAL PRIMARY KEY,
+    usage_id VARCHAR(50) UNIQUE NOT NULL,
+    api_type VARCHAR(50),                            -- openai, ollama, zoho, custom
+    api_endpoint VARCHAR(500),
+    request_type VARCHAR(50),                        -- brain_ai, worker_ai, agent_api
+    request_data JSONB,                              -- Request payload
+    response_data JSONB,                             -- Response data
+    tokens_used INT,                                 -- Total tokens used
+    prompt_tokens INT,                               -- Input tokens
+    completion_tokens INT,                           -- Output tokens
+    request_duration INT,                            -- ms
+    status_code INT,
+    success BOOLEAN DEFAULT TRUE,
+    error_message TEXT,
+    source VARCHAR(50),                              -- brain, worker, api, agent
+    source_id VARCHAR(100),                          -- worker_id, task_id, etc.
+    timestamp TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_ai_api_usage_api_type ON ai_api_usage(api_type);
+CREATE INDEX idx_ai_api_usage_source ON ai_api_usage(source);
+CREATE INDEX idx_ai_api_usage_timestamp ON ai_api_usage(timestamp);
+CREATE INDEX idx_ai_api_usage_tokens ON ai_api_usage(tokens_used);
+17. agent_communications - Brain/Worker/API Communication Logs
+sql
+CREATE TABLE agent_communications (
+    id SERIAL PRIMARY KEY,
+    comm_id VARCHAR(50) UNIQUE NOT NULL,
+    from_agent VARCHAR(50),                          -- brain, worker, api, worker_id
+    to_agent VARCHAR(50),                            -- brain, worker, api, worker_id
+    message_type VARCHAR(50),                        -- task_assign, status_update, result, error
+    message_data JSONB,                              -- Actual message content
+    message_size INT,                                -- Size in bytes
+    is_processed BOOLEAN DEFAULT FALSE,
+    processed_at TIMESTAMP,
+    retry_count INT DEFAULT 0,
+    response_time INT,                               -- ms
+    error_message TEXT,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_agent_communications_from ON agent_communications(from_agent);
+CREATE INDEX idx_agent_communications_to ON agent_communications(to_agent);
+CREATE INDEX idx_agent_communications_message_type ON agent_communications(message_type);
+CREATE INDEX idx_agent_communications_created_at ON agent_communications(created_at);
+18. custom_tasks - Manually Created Tasks (Custom Category)
+sql
+CREATE TABLE custom_tasks (
+    id SERIAL PRIMARY KEY,
+    custom_task_id VARCHAR(50) UNIQUE NOT NULL,
+    project_jobj_id VARCHAR(100) REFERENCES zoho_projects(project_jobj_id) ON DELETE CASCADE,
+    title VARCHAR(500) NOT NULL,
+    description TEXT,
+    test_instructions TEXT,                          -- Manual test instructions
+    priority VARCHAR(20) DEFAULT 'medium',
+    status VARCHAR(20) DEFAULT 'pending',
+    task_id VARCHAR(50) REFERENCES tasks(task_id) ON DELETE SET NULL,
+    created_by VARCHAR(100),                         -- User who created
+    report_generated BOOLEAN DEFAULT FALSE,
+    report_id VARCHAR(50) REFERENCES test_reports(report_id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_custom_tasks_project ON custom_tasks(project_jobj_id);
+CREATE INDEX idx_custom_tasks_status ON custom_tasks(status);
+19. test_execution_history - Detailed Test Run History
+sql
+CREATE TABLE test_execution_history (
+    id SERIAL PRIMARY KEY,
+    execution_id VARCHAR(50) UNIQUE NOT NULL,
+    ticket_id VARCHAR(100) REFERENCES zoho_tickets(ticket_id) ON DELETE CASCADE,
+    task_id VARCHAR(50) REFERENCES tasks(task_id) ON DELETE CASCADE,
+    worker_id VARCHAR(50) REFERENCES worker_registry(worker_id),
+    execution_status VARCHAR(50),                    -- started, running, completed, failed
+    execution_start TIMESTAMP,
+    execution_end TIMESTAMP,
+    duration INT,                                    -- ms
+    screenshots_taken INT,
+    video_recorded BOOLEAN DEFAULT FALSE,
+    video_path TEXT,
+    steps_executed INT,
+    steps_passed INT,
+    steps_failed INT,
+    error_summary TEXT,
+    ai_analysis TEXT,                                -- AI analysis of execution
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_test_execution_ticket ON test_execution_history(ticket_id);
+CREATE INDEX idx_test_execution_task ON test_execution_history(task_id);
+CREATE INDEX idx_test_execution_worker ON test_execution_history(worker_id);
+CREATE INDEX idx_test_execution_status ON test_execution_history(execution_status);
+20. zoho_webhook_logs - Zoho Webhook Events
+sql
+CREATE TABLE zoho_webhook_logs (
+    id SERIAL PRIMARY KEY,
+    webhook_id VARCHAR(100) UNIQUE NOT NULL,
+    event_type VARCHAR(100),                         -- ticket.created, ticket.updated, comment.added
+    payload JSONB,                                   -- Raw webhook payload
+    ticket_id VARCHAR(100),
+    processed BOOLEAN DEFAULT FALSE,
+    processed_at TIMESTAMP,
+    error_message TEXT,
+    received_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE INDEX idx_zoho_webhook_ticket ON zoho_webhook_logs(ticket_id);
+CREATE INDEX idx_zoho_webhook_processed ON zoho_webhook_logs(processed);
+CREATE INDEX idx_zoho_webhook_received ON zoho_webhook_logs(received_at);
