@@ -113,6 +113,27 @@ class WorkerService {
         
         return worker;
     }
+
+    async updateWorker(workerId, workerData) {
+        const worker = await workerRepository.update(workerId, workerData);
+        if (!worker) throw new Error('Worker not found');
+        return worker.toJSON();
+    }
+
+    async deleteWorker(workerId) {
+        const deleted = await workerRepository.delete(workerId);
+        if (!deleted) throw new Error('Worker not found');
+        return true;
+    }
+
+    async getOnlineWorkers() {
+        const workers = await workerRepository.findOnline();
+        return workers.map(w => w.toJSON());
+    }
+
+    async getWorkerHeartbeats(workerId) {
+        return await workerRepository.findHeartbeats(workerId);
+    }
 }
 
 module.exports = new WorkerService();

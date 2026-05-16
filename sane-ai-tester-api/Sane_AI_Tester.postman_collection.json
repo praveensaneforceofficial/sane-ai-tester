@@ -1,0 +1,110 @@
+{
+	"info": {
+		"_postman_id": "sane-ai-tester-collection",
+		"name": "Sane AI Tester API",
+		"description": "Collection for testing Sane AI Tester Central API",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "Health",
+			"item": [
+				{
+					"name": "Basic Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/health",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "health"]
+						}
+					}
+				},
+				{
+					"name": "Detailed Health Check",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/health/detailed",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "health", "detailed"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Workers",
+			"item": [
+				{
+					"name": "Register Worker",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"machineId\": \"mac-001\",\n    \"nickname\": \"Alpha-Worker\",\n    \"ip\": \"127.0.0.1\",\n    \"os\": \"Windows\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/workers/register",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "workers", "register"]
+						}
+					}
+				},
+				{
+					"name": "Get All Workers",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/workers",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "workers"]
+						}
+					}
+				}
+			]
+		},
+		{
+			"name": "Tasks",
+			"item": [
+				{
+					"name": "Create Task",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n    \"task_id\": \"task-101\",\n    \"prompt\": \"Test homepage\",\n    \"url\": \"https://google.com\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/tasks",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "tasks"]
+						}
+					}
+				}
+			]
+		}
+	],
+	"variable": [
+		{
+			"key": "baseUrl",
+			"value": "http://localhost:3000",
+			"type": "string"
+		}
+	]
+}

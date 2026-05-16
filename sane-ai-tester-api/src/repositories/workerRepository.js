@@ -58,6 +58,37 @@ class WorkerRepository {
         return result.rows.length > 0;
     }
 
+    async update(workerId, workerData) {
+        const { nickname, systemIp, osPlatform, workerType, version } = workerData;
+        const result = await db.query(
+            `UPDATE worker_registry 
+             SET nickname = COALESCE($1, nickname), 
+                 system_ip = COALESCE($2, system_ip), 
+                 os_platform = COALESCE($3, os_platform),
+                 worker_type = COALESCE($4, worker_type),
+                 version = COALESCE($5, version),
+                 updated_at = NOW() 
+             WHERE worker_id = $6 RETURNING *`,
+            [nickname, systemIp, osPlatform, workerType, version, workerId]
+        );
+        return result.rows[0] ? new WorkerModel(result.rows[0]) : null;
+    }
+
+    async findOnline() {
+        const result = await db.query(
+            "SELECT * FROM worker_registry WHERE status = 'online' AND last_seen > NOW() - INTERVAL '60 seconds' ORDER BY nickname ASC"
+        );
+        return result.rows.map(row => new WorkerModel(row));
+    }
+
+    async findHeartbeats(workerId) {
+        const result = await db.query(
+            'SELECT * FROM worker_heartbeats WHERE worker_id = $1 ORDER BY heartbeat_at DESC LIMIT 50',
+            [workerId]
+        );
+        return result.rows;
+    }
+
     async getNextWorkerId() {
         const result = await db.query('SELECT COUNT(*) FROM worker_registry');
         const count = parseInt(result.rows[0].count) + 1;

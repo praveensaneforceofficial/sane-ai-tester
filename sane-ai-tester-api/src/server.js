@@ -6,6 +6,13 @@ const database = require('./config/database');
 const SocketManager = require('./socket/socketManager');
 const workerRoutes = require('./routes/worker.routes');
 const taskRoutes = require('./routes/task.routes');
+const projectRoutes = require('./routes/project.routes');
+const ticketRoutes = require('./routes/ticket.routes');
+const reportRoutes = require('./routes/report.routes');
+const errorRoutes = require('./routes/error.routes');
+const analyticsRoutes = require('./routes/analytics.routes');
+const aiUsageRoutes = require('./routes/aiUsage.routes');
+const configRoutes = require('./routes/config.routes');
 const healthRoutes = require('./routes/health.routes');
 
 const app = express();
@@ -24,6 +31,13 @@ app.use(express.json());
 // Routes
 app.use('/api/workers', workerRoutes);
 app.use('/api/tasks', taskRoutes);
+app.use('/api/projects', projectRoutes);
+app.use('/api/tickets', ticketRoutes);
+app.use('/api/reports', reportRoutes);
+app.use('/api/errors', errorRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/ai-usage', aiUsageRoutes);
+app.use('/api/config', configRoutes);
 app.use('/api', healthRoutes);
 
 // Initialize Database
