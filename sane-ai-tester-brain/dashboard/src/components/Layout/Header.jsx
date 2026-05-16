@@ -1,7 +1,7 @@
 import React from 'react'
 import { Bell, Settings, Search, Wifi, WifiOff } from 'lucide-react'
 
-function Header({ isConnected }) {
+function Header({ isConnected, user, onLogout }) {
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
@@ -45,11 +45,18 @@ function Header({ isConnected }) {
           {/* User */}
           <div className="flex items-center gap-3 pl-4 border-l border-gray-200">
             <div className="text-right">
-              <p className="text-sm font-medium text-gray-900">Admin</p>
-              <p className="text-xs text-gray-500">admin@saneforce.com</p>
+              <p className="text-sm font-medium text-gray-900">{user?.username || 'Admin'}</p>
+              <button 
+                onClick={onLogout}
+                className="text-xs text-indigo-600 hover:text-indigo-800 font-semibold"
+              >
+                Logout
+              </button>
             </div>
             <div className="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center">
-              <span className="text-indigo-600 font-medium text-sm">A</span>
+              <span className="text-indigo-600 font-medium text-sm">
+                {(user?.username || 'A')[0].toUpperCase()}
+              </span>
             </div>
           </div>
         </div>

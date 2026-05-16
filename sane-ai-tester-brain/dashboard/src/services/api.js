@@ -30,11 +30,16 @@ api.interceptors.response.use(
     return response.data
   },
   (error) => {
-    const message = error.response?.data?.error || error.message || 'Something went wrong'
-    toast.error(message)
+    // Silently reject error as per user request
     return Promise.reject(error)
   }
 )
+
+// Auth endpoints
+export const authApi = {
+  login: (username, password) => api.post('/auth/login', { username, password }),
+  getMe: () => api.get('/auth/me'),
+}
 
 // Worker endpoints
 export const workerApi = {

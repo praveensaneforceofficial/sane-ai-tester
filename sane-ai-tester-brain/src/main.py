@@ -55,12 +55,14 @@ app.add_middleware(
 )
 
 # Include routers
+from routes import auth as auth_router
 from routes import workers as workers_router
 from routes import tasks as tasks_router
 from routes import analytics as analytics_router
 from routes import reports as reports_router
 from routes import health as health_router
 
+app.include_router(auth_router.router, prefix="/api", tags=["Auth"])
 app.include_router(workers_router.router, prefix="/api", tags=["Workers"])
 app.include_router(tasks_router.router, prefix="/api", tags=["Tasks"])
 app.include_router(analytics_router.router, prefix="/api", tags=["Analytics"])

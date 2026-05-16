@@ -1,28 +1,34 @@
-from loguru import logger
+import logging
 import sys
+import os
+from logging.handlers import RotatingFileHandler
 from config.settings import settings
 
-# Remove default handler
-logger.remove()
-
-# Add console handler
-logger.add(
-    sys.stdout,
-    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | <level>{level: <8}</level> | <cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>",
-    level=settings.LOG_LEVEL,
-    colorize=True
-)
-
-# Add file handler
-logger.add(
-    settings.LOG_FILE,
-    rotation=settings.LOG_MAX_SIZE,
-    retention=f"{settings.LOG_BACKUP_COUNT} days",
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}",
-    level=settings.LOG_LEVEL,
-    compression="zip"
-)
-
-def get_logger(name: str):
-    """Get logger with specific name"""
-    return logger.bind(name=name)
+def get_logger(name):
+    logger = logging.getLogger(name)
+    
+    if not logger.handlers:
+        logger.setLevel(settings.LOG_LEVEL)
+        
+        # Formatter
+        formatter = logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        )
+        
+        # Console Handler
+        console_handler = logging.StreamHandler(sys.stdout)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+        
+        # File Handler
+        if settings.LOG_FILE:
+            os.makedirs(os.path.dirname(settings.LOG_FILE), exist_ok=True)
+            file_handler = RotatingFileHandler(
+                settings.LOG_FILE, 
+                maxBytes=settings.LOG_MAX_SIZE, 
+                backupCount=settings.LOG_BACKUP_COUNT
+            )
+            file_handler.setFormatter(formatter)
+            logger.addHandler(file_handler)
+            
+    return logger

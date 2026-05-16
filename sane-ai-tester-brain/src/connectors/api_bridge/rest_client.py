@@ -38,6 +38,32 @@ class APIRestClient:
             self.is_connected = False
             logger.error(f"POST {endpoint} failed: {e}")
             raise
+
+    async def put(self, endpoint: str, data: Optional[Dict] = None) -> Any:
+        """PUT request to API bridge"""
+        try:
+            url = f"{self.base_url}{endpoint}"
+            response = await self.client.put(url, json=data)
+            response.raise_for_status()
+            self.is_connected = True
+            return response.json()
+        except Exception as e:
+            self.is_connected = False
+            logger.error(f"PUT {endpoint} failed: {e}")
+            raise
+
+    async def delete(self, endpoint: str) -> Any:
+        """DELETE request to API bridge"""
+        try:
+            url = f"{self.base_url}{endpoint}"
+            response = await self.client.delete(url)
+            response.raise_for_status()
+            self.is_connected = True
+            return response.json() if response.content else {"status": "deleted"}
+        except Exception as e:
+            self.is_connected = False
+            logger.error(f"DELETE {endpoint} failed: {e}")
+            raise
     
     async def close(self):
         """Close HTTP client"""

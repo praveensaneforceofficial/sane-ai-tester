@@ -1,26 +1,15 @@
 from services.apiBridgeService import api_bridge_service
-from services.monitorService import monitor_service
 from utils.logger import get_logger
+import asyncio
 
 logger = get_logger(__name__)
 
-async def check_worker_health():
-    """Check health of all workers"""
-    logger.info("🏥 Checking worker health...")
-    
+def check_worker_health():
+    """Trigger worker health refresh on API server"""
     try:
-        workers = await api_bridge_service.get_workers()
-        
-        for worker in workers:
-            worker_id = worker.get('worker_id')
-            status = worker.get('status')
-            last_seen = worker.get('last_seen')
-            
-            # Log worker status
-            logger.debug(f"Worker {worker_id}: {status} (last seen: {last_seen})")
-            
-            # Track metrics
-            await monitor_service.track_worker_health(worker_id, status, last_seen)
-            
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(api_bridge_service.get_health())
+        loop.close()
     except Exception as e:
-        logger.error(f"Worker health check failed: {e}")
+        logger.error(f"Error in worker health job: {e}")

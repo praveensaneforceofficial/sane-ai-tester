@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     # Logging
     LOG_LEVEL: str = "INFO"
     LOG_FILE: str = "./logs/brain.log"
+    LOG_MAX_SIZE: int = 10485760
+    LOG_BACKUP_COUNT: int = 5
     
     # Scheduler
     ZOHO_POLL_INTERVAL: int = 60

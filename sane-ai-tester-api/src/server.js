@@ -4,6 +4,7 @@ const { Server } = require('socket.io');
 const cors = require('cors');
 const database = require('./config/database');
 const SocketManager = require('./socket/socketManager');
+const authRoutes = require('./routes/auth.routes');
 const workerRoutes = require('./routes/worker.routes');
 const taskRoutes = require('./routes/task.routes');
 const projectRoutes = require('./routes/project.routes');
@@ -29,6 +30,7 @@ app.use(cors());
 app.use(express.json());
 
 // Routes
+app.use('/api/auth', authRoutes);
 app.use('/api/workers', workerRoutes);
 app.use('/api/tasks', taskRoutes);
 app.use('/api/projects', projectRoutes);

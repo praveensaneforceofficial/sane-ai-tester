@@ -27,27 +27,35 @@ class APIWebSocketClient:
             self.is_connected = False
         
         @self.sio.event
-        async def update_brain(data):
-            logger.info(f"📡 Received update-brain event: {data}")
-            # This will be handled by event handlers
-            await self._handle_event("update_brain", data)
+        async def dashboard_update(data=None):
+            logger.info("📡 Received dashboard:update event")
+            await self._handle_event("dashboard:update", data)
         
-        @self.sio.event
-        async def task_completed_alert(data):
-            logger.info(f"📥 Task completed: {data.get('taskId')}")
-            await self._handle_event("task_completed", data)
+        @self.sio.on('worker:online')
+        async def worker_online(data):
+            logger.info(f"🟢 Worker online: {data.get('nickname')}")
+            await self._handle_event("worker:online", data)
+
+        @self.sio.on('worker:offline')
+        async def worker_offline(data):
+            logger.info(f"🔴 Worker offline: {data.get('workerId')}")
+            await self._handle_event("worker:offline", data)
+
+        @self.sio.on('report:generated')
+        async def report_generated(data):
+            logger.info(f"📄 Report generated for task: {data.get('taskId')}")
+            await self._handle_event("report:generated", data)
     
     async def _handle_event(self, event: str, data: Dict):
         """Handle incoming events"""
-        # This will be overridden by the main brain
         if hasattr(self, 'event_callback'):
             await self.event_callback(event, data)
     
     async def connect(self):
         """Connect to API Bridge WebSocket"""
         try:
-            await self.sio.connect(settings.API_WS_URL)
-            logger.info(f"Connecting to {settings.API_WS_URL}")
+            await self.sio.connect(settings.API_URL) # Standard Socket.IO connection
+            logger.info(f"Connecting to {settings.API_URL}")
         except Exception as e:
             logger.error(f"WebSocket connection failed: {e}")
             self.is_connected = False
@@ -58,18 +66,29 @@ class APIWebSocketClient:
             await self.sio.disconnect()
             self.is_connected = False
     
-    async def send_task(self, worker_id: str, url: str, prompt: str):
+    async def assign_task(self, worker_id: str, task_id: str, url: str, prompt: str):
         """Send task to worker via API Bridge"""
         if not self.is_connected:
-            logger.error("WebSocket not connected")
             raise Exception("WebSocket not connected")
         
-        await self.sio.emit('send-task-to-worker', {
+        await self.sio.emit('task:assign', {
             'workerId': worker_id,
+            'taskId': task_id,
             'url': url,
             'prompt': prompt
         })
-        logger.info(f"📤 Task sent to {worker_id}: {url}")
+        logger.info(f"📤 Task {task_id} assigned to {worker_id}")
+
+    async def cancel_task(self, worker_id: str, task_id: str):
+        """Cancel task on worker via API Bridge"""
+        if not self.is_connected:
+            raise Exception("WebSocket not connected")
+        
+        await self.sio.emit('task:cancel', {
+            'workerId': worker_id,
+            'taskId': task_id
+        })
+        logger.info(f"🚫 Task {task_id} cancellation sent to {worker_id}")
     
     def set_event_callback(self, callback):
         """Set callback for handling events"""
