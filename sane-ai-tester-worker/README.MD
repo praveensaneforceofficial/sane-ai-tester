@@ -23,7 +23,7 @@ bash
 npm run electron
 ```
 
-#Project Structure for sane-ai-tester-worker
+# Project Structure for sane-ai-tester-worker
 
 sane-ai-tester-worker/
 ├── src/
