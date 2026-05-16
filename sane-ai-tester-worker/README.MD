@@ -13,11 +13,17 @@ AI-powered test execution agent with Playwright automation.
 ## Installation
 
 ```bash
+cd sane-ai-tester-worker
 npm install
 npm run setup
+npm start
+Or with Electron GUI:
 
+bash
+npm run electron
+```
 
-📁 Project Structure for sane-ai-tester-worker
+#Project Structure for sane-ai-tester-worker
 
 sane-ai-tester-worker/
 ├── src/
