@@ -211,3 +211,13 @@ sane-ai-tester-brain/dist/
 sane-ai-tester-brain/build/
 
 
+# sane-ai-teser-worker
+
+recordings/
+.env
+*.log
+*.mp4
+*.png
+.DS_Store
+dist/
+electron-build/
