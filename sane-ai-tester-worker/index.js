@@ -92,11 +92,21 @@ function initAgent(workerId) {
     console.log(`\n🚀 STATUS: ONLINE`);
     console.log(`📡 Listening for Brain commands...`);
     
+    // Store workerId for later use
+    global.workerId = workerId;
+    
     // Tell API we are active to show in Brain Dashboard
-    socket.emit('update-worker-status', { workerId: workerId, action: 'active' });
-
-    // Keep process alive
-    setInterval(() => {}, 1000); 
+    socket.emit('update-worker-status', { 
+        workerId: workerId, 
+        action: 'active' 
+    });
+    
+    // Also emit a heartbeat every 30 seconds to keep online status
+    setInterval(() => {
+        if (socket.connected) {
+            socket.emit('worker-heartbeat', { workerId: workerId });
+        }
+    }, 30000);
 }
 
 socket.on('connect_error', () => {
