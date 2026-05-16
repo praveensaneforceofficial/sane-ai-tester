@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+require('dotenv').config();
 
 class Database {
     constructor() {
@@ -7,7 +8,11 @@ class Database {
 
     connect() {
         this.pool = new Pool({
-            connectionString: "postgres://postgres:Iniyal@14@94.249.213.61:5432/aiDev"
+            host: process.env.DB_HOST,
+            port: process.env.DB_PORT,
+            user: process.env.DB_USER,
+            password: process.env.DB_PASSWORD,
+            database: process.env.DB_NAME,
         });
 
         this.pool.connect((err, client, release) => {
