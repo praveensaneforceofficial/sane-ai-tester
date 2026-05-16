@@ -268,3 +268,39 @@ npm run build
 
 
 
+
+
+# 🧠 Sane-AI Tester Brain
+
+AI Orchestration System for Intelligent Test Automation
+
+## 📋 Overview
+
+Sane-AI Tester Brain is the central control system that orchestrates AI-powered test automation. It integrates with Zoho Sprint, manages worker agents, and provides intelligent test case generation and analysis.
+
+## 🚀 Features
+
+- **AI-Powered Test Generation** - Automatically generate test cases using OpenAI or local LLM
+- **Zoho Sprint Integration** - Sync tasks from Zoho Sprint and convert to test cases
+- **RAG (Retrieval Augmented Generation)** - Learn from historical test cases
+- **Real-time Dashboard** - Monitor workers, tasks, and system health
+- **WebSocket Bridge** - Real-time communication with worker agents
+- **Analytics & Reporting** - Track token usage, success rates, and performance
+
+## 📦 Prerequisites
+
+- Python 3.11+
+- Node.js 18+ (for dashboard)
+- PostgreSQL (via API bridge)
+- Redis (optional, for queues)
+- ChromaDB (for RAG)
+
+## 🛠️ Installation
+
+### 1. Clone and Setup
+
+```bash
+cd sane-ai-tester-brain
+python -m venv venv
+source venv/bin/activate  # Windows: venv\Scripts\activate
+pip install -r requirements.txt
