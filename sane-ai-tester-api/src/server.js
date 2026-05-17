@@ -53,6 +53,35 @@ database.connect();
 const socketManager = new SocketManager(io);
 socketManager.initialize();
 
+// ⏰ Worker Health Checker — runs every 60 seconds
+// Marks workers offline if they haven't sent a heartbeat in 60s
+const workerRepository = require('./repositories/workerRepository');
+
+const startWorkerHealthChecker = () => {
+    setInterval(async () => {
+        try {
+            const markedOffline = await workerRepository.markOfflineInactive();
+            if (markedOffline.length > 0) {
+                console.log(`⏰ Health Check: Marked ${markedOffline.length} worker(s) offline:`, 
+                    markedOffline.map(w => w.nickname).join(', '));
+                // Notify dashboard to refresh worker list
+                io.emit('update-brain');
+                io.emit('dashboard:update');
+                markedOffline.forEach(w => {
+                    io.emit('worker:offline', { workerId: w.worker_id });
+                });
+            } else {
+                console.log(`⏰ Health Check: All workers are active`);
+            }
+        } catch (err) {
+            console.error('❌ Worker health check error:', err.message);
+        }
+    }, 60 * 1000); // every 60 seconds
+    console.log('⏰ Worker health checker started (60s interval)');
+};
+
+startWorkerHealthChecker();
+
 // Error handling
 server.on('error', (error) => {
     console.error('❌ Server error:', error);

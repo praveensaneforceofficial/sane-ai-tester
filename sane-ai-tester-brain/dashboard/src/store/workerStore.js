@@ -10,7 +10,12 @@ export const useWorkerStore = create((set, get) => ({
     set({ loading: true })
     try {
       const response = await api.get('/workers')
-      set({ workers: response.data.workers || response.data, loading: false, error: null })
+      // Axios interceptor already returns response.data, so response IS the parsed body
+      // It could be an array directly, or { workers: [...] }
+      const workers = Array.isArray(response) 
+        ? response 
+        : (response?.workers || response?.data || [])
+      set({ workers, loading: false, error: null })
     } catch (error) {
       set({ error: error.message, loading: false })
     }

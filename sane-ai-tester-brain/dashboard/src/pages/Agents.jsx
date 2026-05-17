@@ -9,19 +9,35 @@ function Agents() {
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [viewType, setViewType] = useState('tree') // 'tree' or 'board'
 
-  const getAgentTheme = (nickname = '', type = '') => {
+  const getAgentTheme = (nickname = '', type = '', status = 'offline') => {
     const nameLower = (nickname || '').toLowerCase()
     const typeLower = (type || '').toLowerCase()
     const isMobile = nameLower.includes('mobile') || typeLower.includes('mobile') || nameLower.includes('usb')
+    const isOnline = status === 'online' || status === 'busy'
     if (isMobile) {
       return {
-        bg: 'bg-orange-500 text-white ring-4 ring-orange-100 shadow-orange-500/20',
-        icon: <Smartphone className="w-5.5 h-5.5" />
+        bg: isOnline
+          ? 'bg-gradient-to-br from-orange-400 to-rose-500 text-white ring-4 ring-orange-200 shadow-lg shadow-orange-400/30'
+          : 'bg-gradient-to-br from-slate-300 to-slate-400 text-white ring-4 ring-slate-100',
+        icon: <Smartphone className="w-5 h-5" />
       }
     }
     return {
-      bg: 'bg-blue-500 text-white ring-4 ring-blue-100 shadow-blue-500/20',
-      icon: <Cpu className="w-5.5 h-5.5" />
+      bg: isOnline
+        ? 'bg-gradient-to-br from-indigo-400 to-blue-600 text-white ring-4 ring-blue-200 shadow-lg shadow-blue-500/30'
+        : 'bg-gradient-to-br from-slate-300 to-slate-400 text-white ring-4 ring-slate-100',
+      icon: <Cpu className="w-5 h-5" />
+    }
+  }
+
+  const getStatusBadge = (status) => {
+    switch (status) {
+      case 'busy':
+        return { label: 'Running', cls: 'bg-emerald-500 text-white border-emerald-400' }
+      case 'online':
+        return { label: 'Idle', cls: 'bg-rose-500 text-white border-rose-400' }
+      default:
+        return { label: 'Offline', cls: 'bg-slate-200 text-slate-500 border-slate-200' }
     }
   }
 
@@ -141,34 +157,36 @@ function Agents() {
             {/* Children Workers Row */}
             <div className="flex justify-around items-start w-full px-6 relative z-10 mt-2 gap-4">
               {workers.map((worker) => {
-                const theme = getAgentTheme(worker.nickname, worker.worker_type);
+                const theme = getAgentTheme(worker.nickname, worker.worker_type, worker.status);
+                const badge = getStatusBadge(worker.status);
                 return (
                   <div
                     key={worker.worker_id}
                     onClick={() => setSelectedAgent(worker)}
                     className="flex flex-col items-center cursor-pointer group hover:scale-105 transition-all duration-200"
                   >
-                    {/* Circle Node */}
-                    <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 transition-all shadow-md group-hover:shadow-lg ${theme.bg}`}>
-                      {theme.icon}
+                    {/* Circle Node with pulse for active */}
+                    <div className="relative">
+                      <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 transition-all ${theme.bg}`}>
+                        {theme.icon}
+                      </div>
+                      {(worker.status === 'online' || worker.status === 'busy') && (
+                        <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full animate-pulse" />
+                      )}
                     </div>
 
                     {/* Details */}
                     <div className="text-center">
-                      <h5 className="font-extrabold text-slate-800 text-xs group-hover:text-indigo-600 transition-colors">
+                      <h5 className="font-extrabold text-slate-800 text-xs group-hover:text-indigo-600 transition-colors max-w-[90px] truncate">
                         {worker.nickname}
                       </h5>
                       <p className="text-[9px] font-mono text-slate-400 mt-0.5">
-                        {worker.system_ip ? worker.system_ip : `Device ID: ${worker.worker_id.substring(0, 8)}`}
+                        {worker.system_ip || `Device ID: ${worker.worker_id.substring(0, 8)}`}
                       </p>
                       
-                      <div className="mt-2.5">
-                        <span className={`px-2.5 py-0.5 text-[8px] font-black uppercase rounded-full border ${
-                          worker.status === 'online'
-                            ? 'bg-rose-50 text-rose-600 border-rose-100'
-                            : 'bg-slate-50 text-slate-400 border-slate-100'
-                        }`}>
-                          {worker.status === 'online' ? 'Idle' : 'Offline'}
+                      <div className="mt-2">
+                        <span className={`px-2.5 py-0.5 text-[8px] font-black uppercase rounded-full border ${badge.cls}`}>
+                          {badge.label}
                         </span>
                       </div>
                     </div>

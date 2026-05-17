@@ -10,17 +10,17 @@ class APIRestClient:
     
     def __init__(self):
         self.base_url = settings.API_URL
-        self.client = httpx.AsyncClient(timeout=30.0)
         self.is_connected = False
     
     async def get(self, endpoint: str, params: Optional[Dict] = None) -> Any:
         """GET request to API bridge"""
         try:
             url = f"{self.base_url}{endpoint}"
-            response = await self.client.get(url, params=params)
-            response.raise_for_status()
-            self.is_connected = True
-            return response.json()
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(url, params=params)
+                response.raise_for_status()
+                self.is_connected = True
+                return response.json()
         except Exception as e:
             self.is_connected = False
             logger.error(f"GET {endpoint} failed: {e}")
@@ -30,10 +30,11 @@ class APIRestClient:
         """POST request to API bridge"""
         try:
             url = f"{self.base_url}{endpoint}"
-            response = await self.client.post(url, json=data)
-            response.raise_for_status()
-            self.is_connected = True
-            return response.json()
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(url, json=data)
+                response.raise_for_status()
+                self.is_connected = True
+                return response.json()
         except Exception as e:
             self.is_connected = False
             logger.error(f"POST {endpoint} failed: {e}")
@@ -57,10 +58,11 @@ class APIRestClient:
         """PUT request to API bridge"""
         try:
             url = f"{self.base_url}{endpoint}"
-            response = await self.client.put(url, json=data)
-            response.raise_for_status()
-            self.is_connected = True
-            return response.json()
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.put(url, json=data)
+                response.raise_for_status()
+                self.is_connected = True
+                return response.json()
         except Exception as e:
             self.is_connected = False
             logger.error(f"PUT {endpoint} failed: {e}")
@@ -70,18 +72,19 @@ class APIRestClient:
         """DELETE request to API bridge"""
         try:
             url = f"{self.base_url}{endpoint}"
-            response = await self.client.delete(url)
-            response.raise_for_status()
-            self.is_connected = True
-            return response.json() if response.content else {"status": "deleted"}
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.delete(url)
+                response.raise_for_status()
+                self.is_connected = True
+                return response.json() if response.content else {"status": "deleted"}
         except Exception as e:
             self.is_connected = False
             logger.error(f"DELETE {endpoint} failed: {e}")
             raise
     
     async def close(self):
-        """Close HTTP client"""
-        await self.client.aclose()
+        """Close HTTP client - no op since we use context managers now"""
+        pass
 
 # Singleton instance
 api_rest_client = APIRestClient()

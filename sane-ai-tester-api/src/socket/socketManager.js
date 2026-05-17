@@ -11,8 +11,6 @@ class SocketManager {
             console.log('🟢 New Socket Connection:', socket.id);
             this.setupEventHandlers(socket);
         });
-
-        // Set up periodic dashboard updates or other server-side triggers if needed
     }
 
     setupEventHandlers(socket) {
@@ -38,7 +36,6 @@ class SocketManager {
             if (workerId) {
                 try {
                     await workerService.updateActivity(workerId);
-                    // Optionally log heartbeat metrics here if a heartbeatService exists
                 } catch (err) {
                     // Silent fail
                 }
@@ -65,6 +62,9 @@ class SocketManager {
             try {
                 await taskService.updateStatus(taskId, 'completed');
                 this.emitDashboardUpdate();
+                
+                // Dashboard Hook expects task-completed-alert
+                this.io.emit('task-completed-alert', { taskId, workerId });
                 this.io.emit('report:generated', { taskId, workerId });
             } catch (err) {
                 console.error('❌ Task complete error:', err);
@@ -98,6 +98,8 @@ class SocketManager {
     }
 
     emitDashboardUpdate() {
+        // UI expects 'update-brain' to refresh React components
+        this.io.emit('update-brain');
         this.io.emit('dashboard:update');
     }
 
