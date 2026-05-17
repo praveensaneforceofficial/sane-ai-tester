@@ -111,6 +111,7 @@ class AIOrchestratorService:
         """Orchestrate custom tasks pipeline from TODO through Testing to Completion"""
         import json
         import time
+        import re
         from services.apiBridgeService import api_bridge_service
 
         logger.info("Starting Brain Agent Orchestration...")
@@ -119,6 +120,7 @@ class AIOrchestratorService:
             "failed_todo": 0,
             "test_case_ready": 0,
             "testing_going": 0,
+            "report_generation": 0,
             "completed_success": 0,
             "completed_failed": 0,
             "messages": []
@@ -139,6 +141,15 @@ class AIOrchestratorService:
         # ----------------------------------------------------
         todo_tasks = [t for t in all_custom_tasks if t.get('status', '').lower() in ('todo', 'pending')]
         
+        # If no agents are online, keep TODO tasks in TODO, wait for agents to come online.
+        if not workers:
+            logger.info("No online workers available. Waiting for agents to come online.")
+            for task in todo_tasks:
+                title = task.get('title')
+                summary_results["messages"].append(f"Task '{title}': Waiting for an online worker agent.")
+            # Skip processing todo_tasks since we have no agents
+            todo_tasks = []
+
         agents_desc = []
         for w in workers:
             agents_desc.append(f"- Nickname: {w.get('nickname')}, ID: {w.get('worker_id')}, Type: {w.get('worker_type')}, Status: {w.get('status')}")
@@ -265,25 +276,86 @@ class AIOrchestratorService:
                         summary_results["testing_going"] += 1
                         summary_results["messages"].append(f"Task '{title}' assigned to agent '{worker_name}' under status TESTING GOING")
                     else:
-                        summary_results["messages"].append(f"Task '{title}' moved to TEST CASE READY but no online idle agents available to execute")
+                        summary_results["messages"].append(f"Task '{title}' moved to TEST CASE READY. Waiting for an online agent to execute.")
                 except Exception as ex:
                     logger.error(f"Failed to execute test assignment workflow for task {task_id}: {ex}")
 
         # ----------------------------------------------------
-        # Phase 2: Process tasks in status 'Testing Going'
+        # Phase 1.5: Process tasks in status 'Test Case Ready'
+        # ----------------------------------------------------
+        ready_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Test Case Ready']
+        available_workers = [w for w in workers if w.get('status') == 'online']
+        
+        for task in ready_tasks:
+            if not available_workers:
+                summary_results["messages"].append(f"Task '{task.get('title')}': waiting for an online agent to become available.")
+                break  # No more available workers left
+                
+            task_id = task.get('custom_task_id')
+            title = task.get('title')
+            description = task.get('description', '')
+            test_instructions = task.get('test_instructions', '')
+            
+            # Select first available worker
+            assigned_worker = available_workers.pop(0)
+            worker_id = assigned_worker.get('worker_id')
+            worker_name = assigned_worker.get('nickname')
+            
+            # Extract URL from description
+            extracted_url = "https://dev.saneforce.com/"
+            if "http://" in description or "https://" in description:
+                urls = re.findall(r'(https?://[^\s]+)', description)
+                if urls:
+                    extracted_url = urls[0]
+            
+            try:
+                # We create a standard runner task in Node to link to
+                timestamp_ms = int(time.time() * 1000)
+                clean_numeric_id = task_id.replace('CT-', '')
+                run_task_id = f"task-{clean_numeric_id}-{timestamp_ms}"
+                
+                # Register/create execution task on Node API
+                await api_bridge_service.create_task({
+                    "task_id": run_task_id,
+                    "title": f"Run: {title}",
+                    "description": f"AI Directed run for {title}. URL: {extracted_url}",
+                    "status": "pending",
+                    "workerId": worker_id
+                })
+                
+                # Link custom task to the Node task and update status to Testing Going
+                await api_bridge_service.update_custom_task(task_id, {
+                    "status": "Testing Going",
+                    "task_id": run_task_id
+                })
+                
+                # Assign and emit to worker!
+                await api_bridge_service.emit_task_assign(
+                    worker_id=worker_id,
+                    task_id=run_task_id,
+                    url=extracted_url,
+                    prompt=test_instructions
+                )
+                
+                summary_results["testing_going"] += 1
+                summary_results["messages"].append(f"Task '{title}' assigned to agent '{worker_name}' under status TESTING GOING")
+            except Exception as ex:
+                logger.error(f"Failed to assign ready task {task_id}: {ex}")
+
+        # ----------------------------------------------------
+        # Phase 2: Process tasks in status 'Testing Going' -> 'Report Generation'
         # ----------------------------------------------------
         testing_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Testing Going']
         
         for task in testing_tasks:
             task_id = task.get('custom_task_id')
             title = task.get('title')
-            description = task.get('description', '')
             node_task_id = task.get('task_id')
             
             if not node_task_id:
                 continue
                 
-            logger.info(f"Checking report for task in progress: {title} (Node task ID: {node_task_id})")
+            logger.info(f"Checking report availability for task in progress: {title} (Node task ID: {node_task_id})")
 
             try:
                 # Try to fetch the report for this task
@@ -292,9 +364,56 @@ class AIOrchestratorService:
                 if not report or not isinstance(report, dict) or 'report_id' not in report:
                     # Report not generated yet
                     logger.info(f"Report not generated yet for task {node_task_id}")
+                    # Check if worker is online, if not mention waiting
+                    worker_status = "offline"
+                    # Find worker in registry
+                    node_task = await api_bridge_service.get_task_status(node_task_id)
+                    assigned_worker_id = node_task.get("workerId") if node_task else None
+                    if assigned_worker_id:
+                        for w in workers:
+                            if w.get("worker_id") == assigned_worker_id:
+                                worker_status = w.get("status", "online")
+                                break
+                    if worker_status != "online":
+                        summary_results["messages"].append(f"Task '{title}' is in TESTING GOING but the assigned agent went offline. Waiting for agent.")
                     continue
                     
                 report_id = report.get('report_id')
+                
+                # Move status to 'Report Generation'
+                await api_bridge_service.update_custom_task(task_id, {
+                    "status": "Report Generation",
+                    "report_id": report_id,
+                    "report_generated": True
+                })
+                summary_results["report_generation"] += 1
+                summary_results["messages"].append(f"Task '{title}' has finished execution. Moved to REPORT GENERATION.")
+                
+            except Exception as e:
+                logger.error(f"Error checking report for task {node_task_id}: {e}")
+
+        # ----------------------------------------------------
+        # Phase 3: Process tasks in status 'Report Generation' -> 'Task Completed'
+        # ----------------------------------------------------
+        report_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Report Generation']
+        
+        for task in report_tasks:
+            task_id = task.get('custom_task_id')
+            title = task.get('title')
+            description = task.get('description', '')
+            node_task_id = task.get('task_id')
+            report_id = task.get('report_id')
+            
+            if not node_task_id or not report_id:
+                continue
+                
+            logger.info(f"AI evaluating report for: {title} (Report ID: {report_id})")
+
+            try:
+                report = await api_bridge_service.get_report_by_task(node_task_id)
+                if not report:
+                    continue
+                    
                 success_rate = report.get('success_rate', 100)
                 error_summary = report.get('error_summary', '')
                 
@@ -341,9 +460,7 @@ class AIOrchestratorService:
                     final_desc = f"[SUCCESS: {summary_text}]\n\n{description}"
                     await api_bridge_service.update_custom_task(task_id, {
                         "status": "Task Completed",
-                        "description": final_desc,
-                        "report_generated": True,
-                        "report_id": report_id
+                        "description": final_desc
                     })
                     summary_results["completed_success"] += 1
                     summary_results["messages"].append(f"Task '{title}' marked COMPLETED with SUCCESS!")
@@ -351,15 +468,13 @@ class AIOrchestratorService:
                     final_desc = f"[FAILED: {summary_text}]\n\n{description}"
                     await api_bridge_service.update_custom_task(task_id, {
                         "status": "Task Completed",
-                        "description": final_desc,
-                        "report_generated": True,
-                        "report_id": report_id
+                        "description": final_desc
                     })
                     summary_results["completed_failed"] += 1
                     summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: {summary_text}")
                     
             except Exception as e:
-                logger.error(f"Error checking report for task {node_task_id}: {e}")
+                logger.error(f"Error evaluating report for custom task {task_id}: {e}")
 
         return summary_results
 

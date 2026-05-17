@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react'
-import { Plus, Filter, RefreshCw, Layers, ExternalLink, Calendar, CheckCircle2, AlertCircle, Database, Play } from 'lucide-react'
+import { Plus, Filter, RefreshCw, Layers, ExternalLink, Calendar, CheckCircle2, AlertCircle, Database, Play, Archive } from 'lucide-react'
 import { useWorkerStore } from '../store/workerStore'
 import { useWebSocket } from '../hooks/useWebSocket'
 import StatusBadge from '../components/Common/StatusBadge'
@@ -125,6 +125,18 @@ function SprintBoard() {
       toast.error(`Failed to trigger Brain Agent: ${err.message}`, { id: loadToast })
     } finally {
       setLoadingBrainAgent(false)
+    }
+  }
+
+  const handleArchiveTask = async (e, customTaskId) => {
+    e.stopPropagation()
+    const tid = toast.loading('Archiving task...')
+    try {
+      await customTaskApi.delete(customTaskId)
+      toast.success('Task archived successfully!', { id: tid })
+      fetchCustomTasks()
+    } catch (err) {
+      toast.error('Failed to archive task.', { id: tid })
     }
   }
 
@@ -596,6 +608,18 @@ function SprintBoard() {
                       }`}>
                         {task.priority}
                       </span>
+                    )}
+
+                    {task.status === 'Task Completed' && task.isCustom && (
+                      <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end">
+                        <button
+                          onClick={(e) => handleArchiveTask(e, task.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 hover:border-rose-200 text-slate-500 hover:text-rose-600 text-xs font-bold rounded-lg transition-all shadow-sm hover:shadow"
+                        >
+                          <Archive className="w-3.5 h-3.5" />
+                          Archive Task
+                        </button>
+                      </div>
                     )}
                   </div>
                 ))}
