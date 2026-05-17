@@ -165,6 +165,7 @@ HEARTBEAT_TIMEOUT=60000
 ## Windows
 
 ```batch
+cd sane-ai-tester-api
 npm run dev
 ```
 

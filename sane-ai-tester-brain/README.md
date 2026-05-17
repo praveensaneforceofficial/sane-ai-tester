@@ -304,3 +304,9 @@ cd sane-ai-tester-brain
 python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
+set PYTHONIOENCODING=utf-8
+python src/main.py
+
+
+cd dashboard
+npm run dev

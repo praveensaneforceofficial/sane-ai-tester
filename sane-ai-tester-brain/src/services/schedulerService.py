@@ -51,12 +51,12 @@ def start_scheduler():
     )
     
     scheduler.start()
-    logger.info("✅ Scheduler started with all jobs")
+    logger.info("Scheduler started with all jobs")
 
 def stop_scheduler():
     """Stop all scheduled jobs"""
     scheduler.shutdown()
-    logger.info("🛑 Scheduler stopped")
+    logger.info("Scheduler stopped")
 
 def get_jobs():
     """Get list of scheduled jobs"""
