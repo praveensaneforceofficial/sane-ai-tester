@@ -2,16 +2,27 @@ import React, { useState } from 'react'
 import { useWorkerStore } from '../store/workerStore'
 import StatusBadge from '../components/Common/StatusBadge'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
-import { Cpu, Server, Wifi, WifiOff, Activity, Clock } from 'lucide-react'
+import { Cpu, Server, Wifi, WifiOff, Activity, Clock, Plus, Smartphone, GitFork, LayoutGrid } from 'lucide-react'
 
 function Agents() {
   const { workers, loading } = useWorkerStore()
   const [selectedAgent, setSelectedAgent] = useState(null)
+  const [viewType, setViewType] = useState('tree') // 'tree' or 'board'
 
-  const getAgentIcon = (type) => {
-    if (type?.includes('Local')) return <Server className="w-5 h-5" />
-    if (type?.includes('Remote')) return <Wifi className="w-5 h-5" />
-    return <Cpu className="w-5 h-5" />
+  const getAgentTheme = (nickname = '', type = '') => {
+    const nameLower = (nickname || '').toLowerCase()
+    const typeLower = (type || '').toLowerCase()
+    const isMobile = nameLower.includes('mobile') || typeLower.includes('mobile') || nameLower.includes('usb')
+    if (isMobile) {
+      return {
+        bg: 'bg-orange-500 text-white ring-4 ring-orange-100 shadow-orange-500/20',
+        icon: <Smartphone className="w-5.5 h-5.5" />
+      }
+    }
+    return {
+      bg: 'bg-blue-500 text-white ring-4 ring-blue-100 shadow-blue-500/20',
+      icon: <Cpu className="w-5.5 h-5.5" />
+    }
   }
 
   const getStatusColor = (status) => {
@@ -28,106 +39,250 @@ function Agents() {
   }
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-6 animate-fade-in pb-12">
+      {/* Upper Date Tag */}
+      <div className="flex items-center gap-2 text-[10px] font-black tracking-widest text-emerald-500 uppercase">
+        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+        Active • {new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+      </div>
+
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">AI Agents</h1>
-        <p className="text-sm text-gray-500 mt-1">Monitor and manage test execution agents</p>
-      </div>
-
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Agents</p>
-              <p className="text-2xl font-bold text-gray-900">{workers.length}</p>
-            </div>
-            <Cpu className="w-8 h-8 text-indigo-500" />
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Online</p>
-              <p className="text-2xl font-bold text-green-600">{workers.filter(w => w.status === 'online').length}</p>
-            </div>
-            <Wifi className="w-8 h-8 text-green-500" />
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Offline</p>
-              <p className="text-2xl font-bold text-gray-600">{workers.filter(w => w.status === 'offline').length}</p>
-            </div>
-            <WifiOff className="w-8 h-8 text-gray-400" />
-          </div>
-        </div>
-        <div className="card p-4">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Active Tasks</p>
-              <p className="text-2xl font-bold text-purple-600">0</p>
-            </div>
-            <Activity className="w-8 h-8 text-purple-500" />
-          </div>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-3xl font-black text-slate-900 tracking-tight">AI Orchestration System</h1>
+          <p className="text-sm text-slate-500 mt-1 font-medium">Intelligent parallel test execution & agent management</p>
         </div>
       </div>
 
-      {/* Agents Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {workers.map((worker) => (
-          <div
-            key={worker.worker_id}
-            className="card p-6 hover:shadow-lg transition-all cursor-pointer"
-            onClick={() => setSelectedAgent(worker)}
+      {/* Section Divider & Toggles */}
+      <div className="pt-6 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-black text-slate-900 flex items-center gap-2">
+            <Cpu className="w-5 h-5 text-indigo-600" />
+            AI Agents ({workers.length} Parallel Executors)
+          </h2>
+        </div>
+        
+        {/* Toggle Pills */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewType('tree')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-full transition-all duration-200 shadow-sm border ${
+              viewType === 'tree'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-slate-900/10'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
           >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-center gap-3">
-                <div className={`p-2 rounded-lg ${worker.status === 'online' ? 'bg-green-50' : 'bg-gray-50'}`}>
-                  {getAgentIcon(worker.worker_type)}
-                </div>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{worker.nickname}</h3>
-                  <p className="text-xs text-gray-500 font-mono">{worker.worker_id}</p>
-                </div>
-              </div>
-              <StatusBadge status={worker.status} />
-            </div>
+            <GitFork className="w-3.5 h-3.5" />
+            Tree View
+          </button>
+          <button
+            onClick={() => setViewType('board')}
+            className={`flex items-center gap-1.5 px-4 py-2 text-xs font-bold rounded-full transition-all duration-200 shadow-sm border ${
+              viewType === 'board'
+                ? 'bg-slate-900 text-white border-slate-900 shadow-slate-900/10'
+                : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+            }`}
+          >
+            <LayoutGrid className="w-3.5 h-3.5" />
+            Board View
+          </button>
+        </div>
+      </div>
 
-            <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500">IP Address</span>
-                <span className="font-mono text-gray-900">{worker.system_ip || 'Not set'}</span>
+      {/* Tree View Content */}
+      {viewType === 'tree' && (
+        workers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-20 bg-white border border-slate-200/60 rounded-3xl shadow-sm">
+            <Cpu className="w-12 h-12 text-slate-300 mb-3 animate-pulse" />
+            <p className="text-sm font-bold text-slate-400">No active parallel executors found</p>
+          </div>
+        ) : (
+          <div className="flex flex-col items-center w-full py-10 bg-white border border-slate-200/60 rounded-3xl shadow-sm relative overflow-hidden">
+            {/* Master Node */}
+            <div className="flex flex-col items-center relative z-10 mb-16">
+              <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center shadow-xl shadow-indigo-500/20 ring-4 ring-indigo-50/50 mb-3 relative animate-pulse-slow">
+                <Server className="w-7 h-7 text-white" />
               </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500">OS Platform</span>
-                <span className="text-gray-900">{worker.os_platform || 'Unknown'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-500">Last Seen</span>
-                <div className="flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-gray-400" />
-                  <span className="text-gray-900 text-xs">
-                    {worker.last_seen ? new Date(worker.last_seen).toLocaleString() : 'Never'}
+              <div className="text-center">
+                <h4 className="font-extrabold text-slate-800 text-sm">AI Agent Master</h4>
+                <span className="text-[10px] font-mono text-slate-400">127.0.0.1</span>
+                <div className="mt-1.5">
+                  <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-full text-[9px] font-extrabold uppercase tracking-wider">
+                    Master
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-gray-100">
+            {/* Connecting SVG Curves */}
+            <div className="absolute inset-x-0 top-[136px] h-[70px] pointer-events-none z-0">
+              <svg className="w-full h-full overflow-visible">
+                {workers.map((w, idx) => {
+                  const startX = "50%";
+                  const startY = 0;
+                  const endX = `${((idx + 0.5) / workers.length) * 100}%`;
+                  const endY = 70;
+                  const pathD = `M ${startX} ${startY} C ${startX} ${startY + 30}, ${endX} ${endY - 30}, ${endX} ${endY}`;
+                  return (
+                    <path
+                      key={w.worker_id}
+                      d={pathD}
+                      fill="none"
+                      stroke="#E2E8F0"
+                      strokeWidth="2"
+                      className="transition-all duration-300"
+                    />
+                  );
+                })}
+              </svg>
+            </div>
+
+            {/* Children Workers Row */}
+            <div className="flex justify-around items-start w-full px-6 relative z-10 mt-2 gap-4">
+              {workers.map((worker) => {
+                const theme = getAgentTheme(worker.nickname, worker.worker_type);
+                return (
+                  <div
+                    key={worker.worker_id}
+                    onClick={() => setSelectedAgent(worker)}
+                    className="flex flex-col items-center cursor-pointer group hover:scale-105 transition-all duration-200"
+                  >
+                    {/* Circle Node */}
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center mb-3 transition-all shadow-md group-hover:shadow-lg ${theme.bg}`}>
+                      {theme.icon}
+                    </div>
+
+                    {/* Details */}
+                    <div className="text-center">
+                      <h5 className="font-extrabold text-slate-800 text-xs group-hover:text-indigo-600 transition-colors">
+                        {worker.nickname}
+                      </h5>
+                      <p className="text-[9px] font-mono text-slate-400 mt-0.5">
+                        {worker.system_ip ? worker.system_ip : `Device ID: ${worker.worker_id.substring(0, 8)}`}
+                      </p>
+                      
+                      <div className="mt-2.5">
+                        <span className={`px-2.5 py-0.5 text-[8px] font-black uppercase rounded-full border ${
+                          worker.status === 'online'
+                            ? 'bg-rose-50 text-rose-600 border-rose-100'
+                            : 'bg-slate-50 text-slate-400 border-slate-100'
+                        }`}>
+                          {worker.status === 'online' ? 'Idle' : 'Offline'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )
+      )}
+
+      {/* Board View Content */}
+      {viewType === 'board' && (
+        <>
+          {/* Stats Bar */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="card p-4">
               <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-500">Success Rate</span>
-                <span className="text-sm font-medium text-gray-900">0%</span>
+                <div>
+                  <p className="text-sm text-gray-500">Total Agents</p>
+                  <p className="text-2xl font-bold text-gray-900">{workers.length}</p>
+                </div>
+                <Cpu className="w-8 h-8 text-indigo-500" />
               </div>
-              <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-green-500 rounded-full" style={{ width: '0%' }} />
+            </div>
+            <div className="card p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Online</p>
+                  <p className="text-2xl font-bold text-green-600">{workers.filter(w => w.status === 'online').length}</p>
+                </div>
+                <Wifi className="w-8 h-8 text-green-500" />
+              </div>
+            </div>
+            <div className="card p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Offline</p>
+                  <p className="text-2xl font-bold text-gray-600">{workers.filter(w => w.status === 'offline').length}</p>
+                </div>
+                <WifiOff className="w-8 h-8 text-gray-400" />
+              </div>
+            </div>
+            <div className="card p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-500">Active Tasks</p>
+                  <p className="text-2xl font-bold text-purple-600">0</p>
+                </div>
+                <Activity className="w-8 h-8 text-purple-500" />
               </div>
             </div>
           </div>
-        ))}
-      </div>
+
+          {/* Grid */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {workers.map((worker) => {
+              const theme = getAgentTheme(worker.nickname, worker.worker_type);
+              return (
+                <div
+                  key={worker.worker_id}
+                  className="card p-6 hover:shadow-lg transition-all cursor-pointer"
+                  onClick={() => setSelectedAgent(worker)}
+                >
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`p-2 rounded-lg ${worker.status === 'online' ? 'bg-blue-50' : 'bg-gray-50'}`}>
+                        <div className={worker.status === 'online' ? 'text-blue-500' : 'text-slate-400'}>
+                          {theme.icon}
+                        </div>
+                      </div>
+                      <div>
+                        <h3 className="font-semibold text-gray-900">{worker.nickname}</h3>
+                        <p className="text-xs text-gray-500 font-mono">{worker.worker_id}</p>
+                      </div>
+                    </div>
+                    <StatusBadge status={worker.status} />
+                  </div>
+
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">IP Address</span>
+                      <span className="font-mono text-gray-900">{worker.system_ip || 'Not set'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">OS Platform</span>
+                      <span className="text-gray-900">{worker.os_platform || 'Unknown'}</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-gray-500">Last Seen</span>
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-gray-400" />
+                        <span className="text-gray-900 text-xs">
+                          {worker.last_seen ? new Date(worker.last_seen).toLocaleString() : 'Never'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-gray-500">Success Rate</span>
+                      <span className="text-sm font-medium text-gray-900">0%</span>
+                    </div>
+                    <div className="mt-2 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                      <div className="h-full bg-green-500 rounded-full" style={{ width: '0%' }} />
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
+      )}
 
       {/* Agent Details Modal */}
       {selectedAgent && (
