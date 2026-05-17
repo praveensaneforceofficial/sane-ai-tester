@@ -57,6 +57,17 @@ async def sync_zoho_projects():
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
+@router.get("/projects/category/{category}")
+async def get_projects_by_category(category: str):
+    """Get projects by category"""
+    try:
+        data = await api_bridge_service.get_projects_by_category(category)
+        return data
+    except Exception as e:
+        logger.error(f"Failed to get projects by category {category}: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})
+
+
 @router.get("/projects/{project_id}")
 async def get_project_by_id(project_id: str):
     """Get a specific project by ID"""

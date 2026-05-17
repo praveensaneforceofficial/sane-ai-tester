@@ -104,6 +104,17 @@ class APIBridgeService:
     async def delete_project(self, project_id: str) -> Dict:
         return await api_rest_client.delete(f"/api/projects/{project_id}")
 
+    # --- Sprints Methods ---
+    async def get_sprints(self, project_id: str) -> Dict:
+        return await api_rest_client.get(f"/api/sprints/{project_id}")
+    
+    async def get_sprint_items(self, project_id: str, sprint_id: str, lane_id: Optional[str] = None) -> Dict:
+        params = {"laneId": lane_id} if lane_id else {}
+        return await api_rest_client.get(f"/api/sprints/{project_id}/{sprint_id}/items", params=params)
+    
+    async def get_sprint_board_url(self, project_id: str, sprint_id: str) -> Dict:
+        return await api_rest_client.get(f"/api/sprints/{project_id}/{sprint_id}/board-url")
+
     # --- 4. Ticket Methods ---
     async def get_all_tickets(self) -> List[Dict]:
         return await api_rest_client.get("/api/tickets")

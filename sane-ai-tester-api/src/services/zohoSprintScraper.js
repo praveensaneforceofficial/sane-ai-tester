@@ -184,20 +184,270 @@ class ZohoSprintScraper {
                 raw_count: formattedProjects.length,
                 projects: formattedProjects
             };
-
         } catch (error) {
-            // Always clean up browser on error
             if (activeBrowser) {
                 try {
                     const proc = activeBrowser.process();
                     if (proc) proc.kill('SIGKILL');
                     await activeBrowser.close().catch(() => {});
-                } catch (e) { /* ignore */ }
+                } catch (e) {}
                 activeBrowser = null;
             }
             if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
             console.error('Zoho Scraper Error:', error.message);
             throw new Error(`Puppeteer Scraper Error: ${error.message}`);
+        }
+    }
+
+    /**
+     * Fetch sprints list for a specific project.
+     */
+    async fetchSprints(projectId) {
+        console.log(`Cleaning up old sessions and fetching sprints for project: ${projectId}...`);
+        killStaleBrowser();
+        await new Promise(r => setTimeout(r, 500));
+
+        try {
+            console.log('Launching browser for sprints fetch...');
+            activeBrowser = await puppeteer.launch({
+                headless: false,
+                defaultViewport: null,
+                userDataDir: sessionDir,
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--new-window']
+            });
+
+            const browserPid = activeBrowser.process()?.pid;
+            if (browserPid) {
+                fs.writeFileSync(pidFile, String(browserPid));
+            }
+
+            const pages = await activeBrowser.pages();
+            for (let i = 1; i < pages.length; i++) {
+                await pages[i].close().catch(() => {});
+            }
+            const page = pages[0];
+
+            console.log('Navigating to Zoho Sprints workspace...');
+            await page.goto('https://sprints.zoho.in/workspace/sanmedia#projects', {
+                timeout: 120000
+            }).catch(() => {});
+
+            // Wait for login if needed
+            let waitTime = 0;
+            while (waitTime < 120000) {
+                const currentUrl = page.url();
+                if (currentUrl.includes('accounts.zoho')) {
+                    await new Promise(r => setTimeout(r, 2000));
+                    waitTime += 2000;
+                    continue;
+                }
+                if (currentUrl.includes('/workspace/sanmedia')) {
+                    await new Promise(r => setTimeout(r, 3000));
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 2000));
+                waitTime += 2000;
+            }
+
+            console.log('Extracting CSRF token...');
+            const cookies = await page.cookies('https://sprints.zoho.in');
+            const zsctCookie = cookies.find(c => c.name === 'zsct') || cookies.find(c => c.name === 'CSRF_TOKEN');
+            const csrfToken = zsctCookie ? `zscp=${zsctCookie.value}` : '';
+
+            const apiUrl = `https://sprints.zoho.in/zsapi/team/60030131597/projects/${projectId}/sprints/?action=data&range=150&type=%5B2%2C3%5D&sort=%7B%22column%22%3A%22type%22%2C%22asc%22%3Atrue%7D&index=1`;
+            console.log(`Fetching sprints from: ${apiUrl}`);
+
+            const rawData = await page.evaluate(async (url, csrf) => {
+                try {
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: {
+                            'accept': '*/*',
+                            'accept-language': 'en-US,en;q=0.9',
+                            'x-requested-with': 'XMLHttpRequest',
+                            'x-zcsrf-token': csrf
+                        }
+                    });
+                    if (!response.ok) return { error: `HTTP ${response.status}` };
+                    return await response.json();
+                } catch (err) {
+                    return { error: err.message };
+                }
+            }, apiUrl, csrfToken);
+
+            try { await activeBrowser.close(); } catch (e) {}
+            activeBrowser = null;
+            if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
+
+            if (rawData.error) {
+                throw new Error(`Zoho API error: ${rawData.error}`);
+            }
+            if (rawData.status !== 'success' || !rawData.sprintJObj) {
+                throw new Error(`Unexpected Zoho response: ${JSON.stringify(rawData).substring(0, 200)}`);
+            }
+
+            const sprintJObj = rawData.sprintJObj;
+            const sprintIds = rawData.sprintIds || Object.keys(sprintJObj);
+
+            const formattedSprints = sprintIds
+                .filter(id => sprintJObj[id])
+                .map(id => {
+                    const arr = sprintJObj[id];
+                    return {
+                        id: id,
+                        name: arr[0] || `Sprint ${id}`,
+                        status: arr[1] === 1 ? 'active' : 'completed',
+                        isActive: arr[1] === 1,
+                        startDate: arr[4] || '',
+                        endDate: arr[5] || ''
+                    };
+                });
+
+            return {
+                success: true,
+                sprints: formattedSprints
+            };
+
+        } catch (error) {
+            if (activeBrowser) {
+                try {
+                    const proc = activeBrowser.process();
+                    if (proc) proc.kill('SIGKILL');
+                    await activeBrowser.close().catch(() => {});
+                } catch (e) {}
+                activeBrowser = null;
+            }
+            if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
+            console.error('Zoho Fetch Sprints Error:', error.message);
+            throw new Error(`Puppeteer Fetch Sprints Error: ${error.message}`);
+        }
+    }
+
+    /**
+     * Fetch items for a specific sprint.
+     */
+    async fetchSprintItems(projectId, sprintId, laneId = null) {
+        const lid = laneId || '-1';
+        console.log(`Cleaning up old sessions and fetching sprint items for project: ${projectId}, sprint: ${sprintId}...`);
+        killStaleBrowser();
+        await new Promise(r => setTimeout(r, 500));
+
+        try {
+            console.log('Launching browser for sprint items...');
+            activeBrowser = await puppeteer.launch({
+                headless: false,
+                defaultViewport: null,
+                userDataDir: sessionDir,
+                args: ['--no-sandbox', '--disable-setuid-sandbox', '--new-window']
+            });
+
+            const browserPid = activeBrowser.process()?.pid;
+            if (browserPid) {
+                fs.writeFileSync(pidFile, String(browserPid));
+            }
+
+            const pages = await activeBrowser.pages();
+            for (let i = 1; i < pages.length; i++) {
+                await pages[i].close().catch(() => {});
+            }
+            const page = pages[0];
+
+            console.log('Navigating to Zoho Sprints...');
+            await page.goto('https://sprints.zoho.in/workspace/sanmedia#projects', {
+                timeout: 120000
+            }).catch(() => {});
+
+            // Wait for login if needed
+            let waitTime = 0;
+            while (waitTime < 120000) {
+                const currentUrl = page.url();
+                if (currentUrl.includes('accounts.zoho')) {
+                    await new Promise(r => setTimeout(r, 2000));
+                    waitTime += 2000;
+                    continue;
+                }
+                if (currentUrl.includes('/workspace/sanmedia')) {
+                    await new Promise(r => setTimeout(r, 3000));
+                    break;
+                }
+                await new Promise(r => setTimeout(r, 2000));
+                waitTime += 2000;
+            }
+
+            console.log('Extracting CSRF token...');
+            const cookies = await page.cookies('https://sprints.zoho.in');
+            const zsctCookie = cookies.find(c => c.name === 'zsct') || cookies.find(c => c.name === 'CSRF_TOKEN');
+            const csrfToken = zsctCookie ? `zscp=${zsctCookie.value}` : '';
+
+            const apiUrl = `https://sprints.zoho.in/zsapi/team/60030131597/projects/${projectId}/sprints/${sprintId}/sprintboard/?action=data&laneid=${lid}&range=100&index=1`;
+            console.log(`Fetching items from: ${apiUrl}`);
+
+            const rawData = await page.evaluate(async (url, csrf) => {
+                try {
+                    const response = await fetch(url, {
+                        method: 'GET',
+                        credentials: 'include',
+                        headers: {
+                            'accept': '*/*',
+                            'accept-language': 'en-US,en;q=0.9',
+                            'x-requested-with': 'XMLHttpRequest',
+                            'x-zcsrf-token': csrf
+                        }
+                    });
+                    if (!response.ok) return { error: `HTTP ${response.status}` };
+                    return await response.json();
+                } catch (err) {
+                    return { error: err.message };
+                }
+            }, apiUrl, csrfToken);
+
+            try { await activeBrowser.close(); } catch (e) {}
+            activeBrowser = null;
+            if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
+
+            if (rawData.error) {
+                throw new Error(`Zoho API error: ${rawData.error}`);
+            }
+            if (rawData.status !== 'success') {
+                throw new Error(`Unexpected Zoho response: ${JSON.stringify(rawData).substring(0, 200)}`);
+            }
+
+            // Parse items robustly
+            const itemObjs = rawData.itemJObj || {};
+            const itemIds = rawData.itemIds || Object.keys(itemObjs);
+
+            const formattedItems = itemIds
+                .filter(id => itemObjs[id])
+                .map(id => {
+                    const arr = itemObjs[id];
+                    return {
+                        id: id,
+                        name: arr[0] || `Item ${id}`,
+                        status: arr[1] || 'Unknown',
+                        priority: arr[2] || 'Medium',
+                        type: arr[3] || 'Task'
+                    };
+                });
+
+            return {
+                success: true,
+                items: formattedItems,
+                raw: rawData
+            };
+
+        } catch (error) {
+            if (activeBrowser) {
+                try {
+                    const proc = activeBrowser.process();
+                    if (proc) proc.kill('SIGKILL');
+                    await activeBrowser.close().catch(() => {});
+                } catch (e) {}
+                activeBrowser = null;
+            }
+            if (fs.existsSync(pidFile)) fs.unlinkSync(pidFile);
+            console.error('Zoho Fetch Items Error:', error.message);
+            throw new Error(`Puppeteer Fetch Items Error: ${error.message}`);
         }
     }
 }

@@ -39,6 +39,18 @@ class ProjectService {
         return projects.map(p => p.toJSON());
     }
 
+    async getSprints(projectId) {
+        // Delegates to scraper for sprint list
+        const scraper = require('../services/zohoSprintScraper');
+        return await scraper.fetchSprints(projectId);
+    }
+
+    async getSprintItems(projectId, sprintId, laneId = null) {
+        const scraper = require('../services/zohoSprintScraper');
+        return await scraper.fetchSprintItems(projectId, sprintId, laneId);
+    }
+
+    // Sync Zoho projects using the scraper
     async syncZoho() {
         const zohoSprintScraper = require('./zohoSprintScraper');
         console.log('Syncing Zoho Projects via Scraper...');
@@ -46,5 +58,4 @@ class ProjectService {
         return result;
     }
 }
-
 module.exports = new ProjectService();

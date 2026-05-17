@@ -15,6 +15,7 @@ const analyticsRoutes = require('./routes/analytics.routes');
 const aiUsageRoutes = require('./routes/aiUsage.routes');
 const configRoutes = require('./routes/config.routes');
 const healthRoutes = require('./routes/health.routes');
+const { router: sprintRoutes } = require('./routes/sprint.routes');
 
 const app = express();
 const server = http.createServer(app);
@@ -41,6 +42,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api', healthRoutes);
+app.use('/api', sprintRoutes);
 
 // Initialize Database
 database.connect();
