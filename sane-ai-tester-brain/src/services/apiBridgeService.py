@@ -270,6 +270,9 @@ class APIBridgeService:
     async def delete_custom_task(self, custom_task_id: str) -> Dict:
         return await api_rest_client.delete(f"/api/custom-tasks/{custom_task_id}")
 
+    async def get_custom_task_actions(self, custom_task_id: str) -> List[Dict]:
+        return await api_rest_client.get(f"/api/custom-tasks/{custom_task_id}/actions")
+
     # --- WebSocket Emitters (Real-time) ---
     async def emit_task_assign(self, worker_id: str, task_id: str, url: str, prompt: str):
         await api_ws_client.assign_task(worker_id, task_id, url, prompt)

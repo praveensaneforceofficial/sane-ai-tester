@@ -85,3 +85,14 @@ async def delete_custom_task(custom_task_id: str):
     except Exception as e:
         logger.error(f"Failed to delete custom task {custom_task_id}: {e}")
         return JSONResponse(status_code=500, content={"error": str(e)})
+
+
+@router.get("/custom-tasks/{custom_task_id}/actions")
+async def get_custom_task_actions(custom_task_id: str):
+    """Get custom task execution actions/logs"""
+    try:
+        data = await api_bridge_service.get_custom_task_actions(custom_task_id)
+        return data
+    except Exception as e:
+        logger.error(f"Failed to get custom task actions {custom_task_id}: {e}")
+        return JSONResponse(status_code=500, content={"error": str(e)})

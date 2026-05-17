@@ -210,6 +210,7 @@ function SprintBoard() {
           error_message: null,
           executed_at: act.created_at
         }))
+        console.log(mappedActions);
         setTaskActionsHistory(mappedActions)
       } else {
         const nodeTaskId = task.id
@@ -948,22 +949,41 @@ function SprintBoard() {
       {/* Task Details and Execution History Modal */}
       {selectedDetailTask && (() => {
         const { cleanText, logs: parsedLogs } = parseTaskPromptAndLogs(selectedDetailTask.prompt)
+        // For custom tasks, skip parsed prompt logs to render action timeline purely from custom_task_actions table
+        const logsToUse = selectedDetailTask.isCustom ? [] : parsedLogs;
+        
         const allLogs = [
-          ...parsedLogs.map((log, index) => ({
+          ...logsToUse.map((log, index) => ({
             action_id: `parsed-log-${index}`,
             action_type: log.type === 'success' ? 'SUCCESS REPORT' : 'EXECUTION LOG',
             status: log.type === 'success' ? 'success' : 'failed',
             details: log.message,
             created_at: null
           })),
-          ...taskActionsHistory.map(action => ({
-            action_id: action.action_id,
-            action_type: action.action_type || 'Run Step',
-            status: action.status,
-            details: action.details,
-            screenshot_url: action.screenshot_url,
-            created_at: action.created_at
-          }))
+          ...taskActionsHistory.map(action => {
+            const actionId = action.action_id || action.id;
+            const type = action.action_type || 'Run Step';
+            
+            let status = 'pending';
+            if (action.status) {
+              status = action.status;
+            } else if (action.success !== undefined) {
+              status = action.success ? 'success' : 'failed';
+            }
+            
+            const details = action.details || action.value || action.error_message || '';
+            const created = action.created_at || action.executed_at || null;
+            const screenshot = action.screenshot_url || action.screenshot_path || null;
+
+            return {
+              action_id: actionId,
+              action_type: type,
+              status: status,
+              details: details,
+              screenshot_url: screenshot,
+              created_at: created
+            };
+          })
         ]
 
         return (
