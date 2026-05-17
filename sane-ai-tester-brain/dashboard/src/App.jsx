@@ -3,6 +3,7 @@ import { Toaster, toast } from 'react-hot-toast'
 import Sidebar from './components/Layout/Sidebar'
 import Header from './components/Layout/Header'
 import Dashboard from './pages/Dashboard'
+import Projects from './pages/Projects'
 import SprintBoard from './pages/SprintBoard'
 import Agents from './pages/Agents'
 import Analytics from './pages/Analytics'
@@ -41,6 +42,8 @@ function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard />
+      case 'projects':
+        return <Projects />
       case 'sprint':
         return <SprintBoard />
       case 'agents':

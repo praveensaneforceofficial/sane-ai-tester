@@ -57,6 +57,14 @@ export const taskApi = {
   retry: (taskId) => api.post(`/tasks/retry/${taskId}`),
 }
 
+// Project endpoints
+export const projectApi = {
+  getAll: () => api.get('/projects'),
+  getActive: () => api.get('/projects/active'),
+  sync: () => api.post('/projects/sync'),
+  create: (data) => api.post('/projects', data),
+}
+
 // Analytics endpoints
 export const analyticsApi = {
   getDashboardStats: () => api.get('/dashboard/stats'),

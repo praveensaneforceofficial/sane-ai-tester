@@ -7,11 +7,13 @@ import {
   FileText,
   HelpCircle,
   LogOut,
-  Sparkles
+  Sparkles,
+  Folder
 } from 'lucide-react'
 
 const menuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { id: 'projects', label: 'Projects', icon: Folder },
   { id: 'sprint', label: 'Sprint Board', icon: Columns },
   { id: 'agents', label: 'Agents', icon: Bot },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
