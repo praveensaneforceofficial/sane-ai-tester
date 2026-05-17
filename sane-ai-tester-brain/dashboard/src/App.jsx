@@ -27,15 +27,6 @@ function App() {
   useEffect(() => {
     setIsConnected(wsConnected)
     fetchWorkers()
-    
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(() => {
-      if (wsConnected) {
-        fetchWorkers()
-      }
-    }, 10000)
-    
-    return () => clearInterval(interval)
   }, [wsConnected, fetchWorkers])
   
   const renderPage = () => {
