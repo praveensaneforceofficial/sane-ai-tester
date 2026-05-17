@@ -52,6 +52,18 @@ async def update_custom_task(custom_task_id: str, task_data: dict):
         return JSONResponse(status_code=500, content={"error": str(e)})
 
 
+@router.get("/custom-tasks/check-ai")
+async def check_ai_availability():
+    """Check AI API configuration and reachability"""
+    from services.aiOrchestratorService import ai_orchestrator
+    try:
+        data = await ai_orchestrator.check_ai_availability()
+        return data
+    except Exception as e:
+        logger.error(f"AI availability check failed: {e}")
+        return JSONResponse(status_code=500, content={"available": False, "error": str(e)})
+
+
 @router.post("/custom-tasks/start-brain-agent")
 async def start_brain_agent():
     """Trigger the Brain Agent QA Director Orchestration workflow"""

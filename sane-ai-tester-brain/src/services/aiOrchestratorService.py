@@ -53,6 +53,60 @@ class AIOrchestratorService:
             logger.error(f"Failed to analyze error: {e}")
             return {"analysis": "Analysis failed", "severity": "Unknown"}
 
+    async def check_ai_availability(self) -> Dict[str, Any]:
+        """Check if AI provider (OpenAI or Ollama) is configured and working"""
+        # 1. Check OpenAI
+        if settings.OPENAI_API_KEY:
+            try:
+                from ai.llm.openai_client import openai_client
+                if not openai_client.client:
+                    return {
+                        "available": False,
+                        "provider": "OpenAI",
+                        "error": "OpenAI client is not initialized. Please verify your OPENAI_API_KEY."
+                    }
+                # Quick lightweight validation call to OpenAI
+                await openai_client.client.models.list()
+                return {
+                    "available": True,
+                    "provider": "OpenAI",
+                    "model": settings.OPENAI_MODEL
+                }
+            except Exception as e:
+                logger.error(f"OpenAI API Key validation failed: {e}")
+                return {
+                    "available": False,
+                    "provider": "OpenAI",
+                    "error": f"OpenAI API key validation failed: {str(e)}. Please check your API key."
+                }
+        
+        # 2. Check Ollama fallback
+        else:
+            try:
+                import httpx
+                # Check if Ollama service is reachable
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    response = await client.get(f"{settings.OLLAMA_URL}/api/tags")
+                    if response.status_code == 200:
+                        return {
+                            "available": True,
+                            "provider": "Ollama",
+                            "model": settings.OLLAMA_MODEL
+                        }
+                    else:
+                        return {
+                            "available": False,
+                            "provider": "Ollama",
+                            "error": f"Ollama returned status {response.status_code}."
+                        }
+            except Exception as e:
+                logger.error(f"Ollama health check failed: {e}")
+                return {
+                    "available": False,
+                    "provider": "None",
+                    "error": "No AI API configured: OpenAI key is missing, and local Ollama is not running/unreachable."
+                }
+
     async def run_brain_agent_orchestration(self) -> Dict[str, Any]:
         """Orchestrate custom tasks pipeline from TODO through Testing to Completion"""
         import json

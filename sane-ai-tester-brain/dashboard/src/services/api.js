@@ -65,6 +65,7 @@ export const customTaskApi = {
   updateStatus: (customTaskId, status) => api.put(`/custom-tasks/${customTaskId}/status`, { status }),
   delete: (customTaskId) => api.delete(`/custom-tasks/${customTaskId}`),
   startBrainAgent: () => api.post('/custom-tasks/start-brain-agent'),
+  checkAi: () => api.get('/custom-tasks/check-ai'),
 }
 
 // Project endpoints

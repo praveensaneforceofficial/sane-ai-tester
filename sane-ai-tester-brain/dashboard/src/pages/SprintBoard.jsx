@@ -91,8 +91,22 @@ function SprintBoard() {
 
   const handleStartBrainAgent = async () => {
     setLoadingBrainAgent(true)
-    const loadToast = toast.loading('Brain Agent QA Director starting orchestration...')
+    const loadToast = toast.loading('Verifying AI API availability...')
     try {
+      // 1. Check if AI API is available
+      const aiStatus = await customTaskApi.checkAi()
+      if (!aiStatus.available) {
+        toast.error(
+          `⚠️ AI API Key/Provider Issue: ${aiStatus.error || 'AI service is currently unavailable. Please check your settings.'}`,
+          { id: loadToast, duration: 8000 }
+        )
+        setLoadingBrainAgent(false)
+        return
+      }
+
+      // 2. Start Brain Agent orchestration if AI is available
+      toast.loading(`AI API is available (${aiStatus.provider} - ${aiStatus.model}). Starting Brain Agent QA Director...`, { id: loadToast })
+      
       const result = await customTaskApi.startBrainAgent()
       if (result.error) {
         toast.error(`Orchestration failed: ${result.error}`, { id: loadToast })
@@ -100,9 +114,9 @@ function SprintBoard() {
         const msgList = result.messages || []
         if (msgList.length > 0) {
           toast.success(`Orchestration Complete! Processed ${result.processed_todo} tasks.`, { id: loadToast })
-          msgList.forEach(m => toast.success(m, { duration: 6000 }))
+          msgList.forEach(m => toast.success(`🤖 AI Task Update: ${m}`, { duration: 8000 }))
         } else {
-          toast.success('Brain Agent analyzed state: everything up to date!', { id: loadToast })
+          toast.success(`Brain Agent analyzed state using ${aiStatus.provider}: everything up to date!`, { id: loadToast })
         }
         // Refresh custom tasks
         fetchCustomTasks()

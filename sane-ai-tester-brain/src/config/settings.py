@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     
     # OpenAI Configuration
     OPENAI_API_KEY: Optional[str] = None
-    OPENAI_MODEL: str = "gpt-4-turbo-preview"
+    OPENAI_MODEL: str = "gpt-4o"
     OPENAI_MAX_TOKENS: int = 4000
     
     # Ollama Configuration

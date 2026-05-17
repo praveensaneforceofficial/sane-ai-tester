@@ -32,7 +32,7 @@ const config = {
     OLLAMA_URL: process.env.OLLAMA_URL || 'http://localhost:11434',
     OLLAMA_MODEL: process.env.OLLAMA_MODEL || 'llama3',
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-    OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4-turbo-preview',
+    OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o',
     
     // Logging
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',
