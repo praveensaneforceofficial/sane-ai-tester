@@ -62,8 +62,17 @@ class Agent {
             
             const instructions = task.prompt || task.test_instructions || 'Navigate and check page';
             
+            // 0. Extract DOM Selector Context to assist the AI
+            let domContext = "";
+            try {
+                logger.info(`🔍 Fetching live DOM context from ${task.url} to guide the AI...`);
+                domContext = await this.puppeteerRunner.getDOMContext(task.url);
+            } catch (domErr) {
+                logger.warn(`⚠️ Could not retrieve live DOM context: ${domErr.message}`);
+            }
+
             // 1. Generate Puppeteer Script dynamically via AI
-            const scriptCode = await this.aiExecutor.generatePuppeteerScript(instructions, task.url);
+            const scriptCode = await this.aiExecutor.generatePuppeteerScript(instructions, task.url, domContext);
             
             // 2. Execute the generated Script directly
             const executionResult = await this.puppeteerRunner.executeDynamicScript(scriptCode, {

@@ -326,6 +326,39 @@ class PuppeteerRunner {
         }
     }
     
+    async getDOMContext(url) {
+        let tempPage = null;
+        try {
+            tempPage = await this.browser.newPage();
+            await tempPage.setDefaultNavigationTimeout(30000);
+            await tempPage.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+            await tempPage.goto(url, { waitUntil: 'networkidle2', timeout: 30000 });
+            
+            const context = await tempPage.evaluate(() => {
+                const inputs = Array.from(document.querySelectorAll('input, select, textarea')).map(el => {
+                    return `Input - name: "${el.name || ''}", id: "${el.id || ''}", type: "${el.type || ''}", placeholder: "${el.placeholder || ''}"`;
+                });
+                const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, button.btn')).map(el => {
+                    return `Button - text: "${el.innerText || el.value || ''}", id: "${el.id || ''}", name: "${el.name || ''}", outerHTML: "${el.outerHTML.substring(0, 150)}..."`;
+                });
+                return {
+                    title: document.title,
+                    inputs: inputs.slice(0, 15),
+                    buttons: buttons.slice(0, 15)
+                };
+            });
+            
+            return `Page Title: "${context.title}"\nAvailable Inputs:\n${context.inputs.join('\n')}\nAvailable Buttons:\n${context.buttons.join('\n')}`;
+        } catch (err) {
+            logger.error(`Failed to extract DOM context: ${err.message}`);
+            return "No DOM context available due to error.";
+        } finally {
+            if (tempPage) {
+                await tempPage.close().catch(() => {});
+            }
+        }
+    }
+    
     async close() {
         if (this.browser) {
             await this.browser.close().catch(() => {});

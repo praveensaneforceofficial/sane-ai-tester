@@ -25,7 +25,7 @@ class AIExecutor {
      * @param {string} url Target URL
      * @returns {Promise<string>} Raw JavaScript code to execute
      */
-    async generatePuppeteerScript(prompt, url) {
+    async generatePuppeteerScript(prompt, url, domContext = "") {
         logger.info("🧠 Generating dynamic Puppeteer script via AI...");
         
         const systemPrompt = `You are a Senior QA Automation Engineer writing a Puppeteer automation script.
@@ -52,16 +52,27 @@ await page.click('button[type="submit"]');
 logger.info("Finished");
 `;
 
-        const userPrompt = `Target URL: ${url}\nInstructions: ${prompt}\n\nPlease generate the raw Puppeteer JavaScript code to execute this test scenario.`;
+        let userPrompt = `Target URL: ${url}\nInstructions: ${prompt}\n\n`;
+        if (domContext) {
+            userPrompt += `DOM SELECTOR CONTEXT OF TARGET PAGE:\n${domContext}\n\n`;
+        }
+        userPrompt += `Please generate the raw Puppeteer JavaScript code to execute this test scenario. Make sure to use the exact matching selectors from the DOM Selector Context above if provided!`;
 
         try {
             let scriptCode = "";
             
-            // Prefer OpenAI if configured
-            if (this.openaiKey) {
+            // Respect AI_MODE configuration
+            if (this.aiMode === 'openai' && this.openaiKey) {
                 scriptCode = await this.callOpenAI(systemPrompt, userPrompt);
-            } else {
+            } else if (this.aiMode === 'local') {
                 scriptCode = await this.callOllama(systemPrompt + "\n" + userPrompt);
+            } else {
+                // Fallback
+                if (this.openaiKey) {
+                    scriptCode = await this.callOpenAI(systemPrompt, userPrompt);
+                } else {
+                    scriptCode = await this.callOllama(systemPrompt + "\n" + userPrompt);
+                }
             }
             
             // Clean up Markdown backticks if AI accidentally includes them
@@ -93,10 +104,17 @@ Format your response as a professional summary report (1-3 small paragraphs). No
         const userPrompt = `Test Instructions: ${prompt}\nExecution Success: ${success}\nExecution Logs:\n${logs}`;
 
         try {
-            if (this.openaiKey) {
+            if (this.aiMode === 'openai' && this.openaiKey) {
                 return await this.callOpenAI(systemPrompt, userPrompt);
-            } else {
+            } else if (this.aiMode === 'local') {
                 return await this.callOllama(systemPrompt + "\n" + userPrompt);
+            } else {
+                // Fallback
+                if (this.openaiKey) {
+                    return await this.callOpenAI(systemPrompt, userPrompt);
+                } else {
+                    return await this.callOllama(systemPrompt + "\n" + userPrompt);
+                }
             }
         } catch (err) {
             logger.error(`Summary generation failed: ${err.message}`);

@@ -14,7 +14,7 @@ class S3Service {
         };
 
         const endpoint = process.env.R2_ENDPOINT;
-        this.bucketName = process.env.R2_BUCKET_NAME || 'sane-ai-teste';
+        this.bucketName = process.env.R2_BUCKET_NAME || 'sane-ai-tester';
         this.publicUrl = process.env.R2_PUBLIC_URL || 'https://pub-cb1eb173f59642cab6c712344a37c507.r2.dev';
 
         if (credentials.accessKeyId && credentials.secretAccessKey && endpoint) {
