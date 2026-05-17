@@ -28,6 +28,10 @@ class CustomTaskService {
         return await customTaskRepository.updateStatus(customTaskId, status);
     }
 
+    async update(customTaskId, updateData) {
+        return await customTaskRepository.update(customTaskId, updateData);
+    }
+
     async delete(customTaskId) {
         return await customTaskRepository.delete(customTaskId);
     }

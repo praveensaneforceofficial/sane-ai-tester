@@ -55,6 +55,7 @@ export const taskApi = {
   getHistory: (workerId, limit = 50) => api.get(`/tasks/history/${workerId}`, { params: { limit } }),
   getStatus: (taskId) => api.get(`/tasks/status/${taskId}`),
   retry: (taskId) => api.post(`/tasks/retry/${taskId}`),
+  getActions: (taskId) => api.get(`/tasks/${taskId}/actions`),
 }
 
 // Custom Task endpoints
@@ -63,6 +64,7 @@ export const customTaskApi = {
   create: (data) => api.post('/custom-tasks', data),
   updateStatus: (customTaskId, status) => api.put(`/custom-tasks/${customTaskId}/status`, { status }),
   delete: (customTaskId) => api.delete(`/custom-tasks/${customTaskId}`),
+  startBrainAgent: () => api.post('/custom-tasks/start-brain-agent'),
 }
 
 // Project endpoints

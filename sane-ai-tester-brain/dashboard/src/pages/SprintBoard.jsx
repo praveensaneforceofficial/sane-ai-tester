@@ -5,7 +5,7 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import StatusBadge from '../components/Common/StatusBadge'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
 import toast from 'react-hot-toast'
-import { customTaskApi } from '../services/api'
+import { customTaskApi, taskApi } from '../services/api'
 
 const statusColumns = ['TODO', 'Test Case Ready', 'Testing Going', 'Report Generation', 'Task Completed']
 
@@ -38,6 +38,11 @@ function SprintBoard() {
   const [loadingItems, setLoadingItems] = useState(false)
   const [isCachedData, setIsCachedData] = useState(false)
   const [zohoBoardUrl, setZohoBoardUrl] = useState('')
+  const [minimizeZohoPanel, setMinimizeZohoPanel] = useState(false)
+  const [loadingBrainAgent, setLoadingBrainAgent] = useState(false)
+  const [selectedDetailTask, setSelectedDetailTask] = useState(null)
+  const [taskActionsHistory, setTaskActionsHistory] = useState([])
+  const [loadingActions, setLoadingActions] = useState(false)
 
   // Fetch projects from backend or fallback to localStorage cache
   const loadZohoProjectsList = async () => {
@@ -81,6 +86,49 @@ function SprintBoard() {
       setCustomTasks(data || [])
     } catch (e) {
       console.error('Failed to load custom tasks:', e)
+    }
+  }
+
+  const handleStartBrainAgent = async () => {
+    setLoadingBrainAgent(true)
+    const loadToast = toast.loading('Brain Agent QA Director starting orchestration...')
+    try {
+      const result = await customTaskApi.startBrainAgent()
+      if (result.error) {
+        toast.error(`Orchestration failed: ${result.error}`, { id: loadToast })
+      } else {
+        const msgList = result.messages || []
+        if (msgList.length > 0) {
+          toast.success(`Orchestration Complete! Processed ${result.processed_todo} tasks.`, { id: loadToast })
+          msgList.forEach(m => toast.success(m, { duration: 6000 }))
+        } else {
+          toast.success('Brain Agent analyzed state: everything up to date!', { id: loadToast })
+        }
+        // Refresh custom tasks
+        fetchCustomTasks()
+      }
+    } catch (err) {
+      toast.error(`Failed to trigger Brain Agent: ${err.message}`, { id: loadToast })
+    } finally {
+      setLoadingBrainAgent(false)
+    }
+  }
+
+  const handleOpenTaskDetails = async (task) => {
+    setSelectedDetailTask(task)
+    setTaskActionsHistory([])
+    
+    const nodeTaskId = task.isCustom ? task.rawTask?.task_id : task.id
+    if (nodeTaskId) {
+      setLoadingActions(true)
+      try {
+        const actions = await taskApi.getActions(nodeTaskId)
+        setTaskActionsHistory(Array.isArray(actions) ? actions : [])
+      } catch (err) {
+        console.error('Failed to fetch task actions history:', err)
+      } finally {
+        setLoadingActions(false)
+      }
     }
   }
 
@@ -307,7 +355,8 @@ function SprintBoard() {
       priority: ct.priority,
       workerName: ct.project_name || 'Local Task',
       workerId: 'Local Task',
-      isCustom: true
+      isCustom: true,
+      rawTask: ct
     }))
   ]
 
@@ -340,7 +389,7 @@ function SprintBoard() {
         <div className="absolute top-0 right-0 w-96 h-96 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
         <div className="absolute -bottom-10 -left-10 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-white/10">
+        <div className={`relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6 ${minimizeZohoPanel ? '' : 'pb-6 border-b border-white/10'}`}>
           <div className="flex items-center gap-4">
             <div className="p-3 bg-white/10 rounded-2xl backdrop-blur-md text-indigo-300 border border-white/10">
               <Database className="w-6 h-6 animate-pulse" />
@@ -362,101 +411,123 @@ function SprintBoard() {
               <RefreshCw className={`w-4 h-4 ${loadingZoho ? 'animate-spin text-indigo-400' : ''}`} />
               Sync Projects List
             </button>
+            <button
+              onClick={() => setMinimizeZohoPanel(!minimizeZohoPanel)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 border border-white/15 text-white text-sm font-semibold rounded-xl transition-all"
+            >
+              {minimizeZohoPanel ? 'Expand Details' : 'Minimize'}
+            </button>
           </div>
         </div>
 
-        <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
-          {/* Select Zoho Project */}
-          <div className="flex flex-col gap-2">
-            <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Select Zoho Project</label>
-            <div className="flex gap-2">
-              <select
-                value={selectedProject}
-                onChange={(e) => setSelectedProject(e.target.value)}
-                className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-medium"
-              >
-                <option value="" className="text-slate-900">-- Select Project --</option>
-                {zohoProjects.map(proj => (
-                  <option key={proj.project_jobj_id} value={proj.project_jobj_id} className="text-slate-900">
-                    {proj.project_name}
-                  </option>
-                ))}
-              </select>
-              <button
-                onClick={() => handleFetchSprints(false)}
-                disabled={!selectedProject || loadingSprints}
-                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/40 text-white text-sm font-bold rounded-xl transition-all shadow-md"
-              >
-                {loadingSprints ? 'Loading...' : 'Sync Sprints'}
-              </button>
-            </div>
-            {zohoProjects.length === 0 && (
-              <span className="text-[11px] text-amber-400 flex items-center gap-1 mt-1">
-                <AlertCircle className="w-3 h-3" />
-                No cached projects found. Run "Sync Projects List" above.
-              </span>
-            )}
-          </div>
-
-          {/* Sprints List Container */}
-          <div className="lg:col-span-2 flex flex-col gap-2">
-            <div className="flex justify-between items-center">
-              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sprints List ({sprintList.length})</label>
-              {selectedProject && sprintList.length > 0 && (
-                <button 
-                  onClick={() => handleFetchSprints(true)}
-                  className="text-[11px] text-indigo-300 hover:text-white flex items-center gap-1 font-semibold transition-colors"
+        {!minimizeZohoPanel && (
+          <div className="relative z-10 grid grid-cols-1 lg:grid-cols-3 gap-6 pt-6">
+            {/* Select Zoho Project */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Select Zoho Project</label>
+              <div className="flex gap-2">
+                <select
+                  value={selectedProject}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                  className="flex-1 px-4 py-2.5 bg-white/5 border border-white/10 text-white rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none transition-all text-sm font-medium"
                 >
-                  <RefreshCw className="w-2.5 h-2.5" /> Refresh List
+                  <option value="" className="text-slate-900">-- Select Project --</option>
+                  {zohoProjects.map(proj => (
+                    <option key={proj.project_jobj_id} value={proj.project_jobj_id} className="text-slate-900">
+                      {proj.project_name}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={() => handleFetchSprints(false)}
+                  disabled={!selectedProject || loadingSprints}
+                  className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-600/40 text-white text-sm font-bold rounded-xl transition-all shadow-md"
+                >
+                  {loadingSprints ? 'Loading...' : 'Sync Sprints'}
                 </button>
+              </div>
+              {zohoProjects.length === 0 && (
+                <span className="text-[11px] text-amber-400 flex items-center gap-1 mt-1">
+                  <AlertCircle className="w-3 h-3" />
+                  No cached projects found. Run "Sync Projects List" above.
+                </span>
               )}
             </div>
 
-            {sprintList.length === 0 ? (
-              <div className="flex items-center justify-center h-[52px] border border-dashed border-white/10 rounded-xl bg-white/5 text-slate-400 text-xs">
-                Select a project and click "Sync Sprints" to retrieve active sprints
-              </div>
-            ) : (
-              <div className="flex gap-3 overflow-x-auto pb-1 max-h-[120px] scrollbar-thin scrollbar-thumb-white/15">
-                {sprintList.map(sprint => (
-                  <button
-                    key={sprint.id}
-                    onClick={() => handleFetchSprintItems(sprint, false)}
-                    className="flex-shrink-0 flex flex-col justify-between items-start p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl w-48 text-left transition-all duration-200 group"
+            {/* Sprints List Container */}
+            <div className="lg:col-span-2 flex flex-col gap-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs font-bold text-slate-400 uppercase tracking-wider">Sprints List ({sprintList.length})</label>
+                {selectedProject && sprintList.length > 0 && (
+                  <button 
+                    onClick={() => handleFetchSprints(true)}
+                    className="text-[11px] text-indigo-300 hover:text-white flex items-center gap-1 font-semibold transition-colors"
                   >
-                    <div className="w-full">
-                      <span className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-300 transition-colors">
-                        {sprint.name}
-                      </span>
-                      <span className="text-[10px] text-slate-400 mt-1 block">
-                        ID: {sprint.id}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between w-full mt-2 pt-2 border-t border-white/5">
-                      <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${
-                        sprint.isActive || sprint.status === 'active' 
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
-                          : 'bg-white/5 text-slate-400'
-                      }`}>
-                        {sprint.status}
-                      </span>
-                      <span className="text-[9px] text-indigo-300 group-hover:underline">View Items</span>
-                    </div>
+                    <RefreshCw className="w-2.5 h-2.5" /> Refresh List
                   </button>
-                ))}
+                )}
               </div>
-            )}
+
+              {sprintList.length === 0 ? (
+                <div className="flex items-center justify-center h-[52px] border border-dashed border-white/10 rounded-xl bg-white/5 text-slate-400 text-xs">
+                  Select a project and click "Sync Sprints" to retrieve active sprints
+                </div>
+              ) : (
+                <div className="flex gap-3 overflow-x-auto pb-1 max-h-[120px] scrollbar-thin scrollbar-thumb-white/15">
+                  {sprintList.map(sprint => (
+                    <button
+                      key={sprint.id}
+                      onClick={() => handleFetchSprintItems(sprint, false)}
+                      className="flex-shrink-0 flex flex-col justify-between items-start p-3 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-white/20 rounded-xl w-48 text-left transition-all duration-200 group"
+                    >
+                      <div className="w-full">
+                        <span className="text-xs font-bold text-white line-clamp-1 group-hover:text-indigo-300 transition-colors">
+                          {sprint.name}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mt-1 block">
+                          ID: {sprint.id}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between w-full mt-2 pt-2 border-t border-white/5">
+                        <span className={`text-[9px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${
+                          sprint.isActive || sprint.status === 'active' 
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' 
+                            : 'bg-white/5 text-slate-400'
+                        }`}>
+                          {sprint.status}
+                        </span>
+                        <span className="text-[9px] text-indigo-300 group-hover:underline">View Items</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Kanban Board Header */}
-      <div>
-        <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-          <Layers className="w-5 h-5 text-indigo-600" />
-          Local Worker Board
-        </h2>
-        <p className="text-xs text-slate-500 mt-0.5">Drag-and-drop tasks to update live worker execution statuses</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <Layers className="w-5 h-5 text-indigo-600" />
+            Worker Board
+          </h2>
+          <p className="text-xs text-slate-500 mt-0.5">Drag-and-drop tasks to update live worker execution statuses</p>
+        </div>
+        <div>
+          <button
+            onClick={handleStartBrainAgent}
+            disabled={loadingBrainAgent}
+            className={`flex items-center gap-2 px-4.5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg ${
+              loadingBrainAgent ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
+          >
+            <Play className={`w-4 h-4 ${loadingBrainAgent ? 'animate-spin' : ''}`} />
+            {loadingBrainAgent ? 'Running Brain Agent...' : 'Start Brain Agent'}
+          </button>
+        </div>
       </div>
 
       {/* Kanban Board */}
@@ -485,7 +556,8 @@ function SprintBoard() {
                     key={task.id}
                     draggable
                     onDragStart={() => handleDragStart(task)}
-                    className="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80 cursor-move hover:shadow-md hover:border-slate-300 transition-all duration-200 relative group"
+                    onClick={() => handleOpenTaskDetails(task)}
+                    className="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80 cursor-pointer hover:shadow-md hover:border-slate-300 transition-all duration-200 relative group"
                   >
                     <div className="flex items-start justify-between mb-2">
                       <span className="text-[10px] font-bold font-mono text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
@@ -715,6 +787,174 @@ function SprintBoard() {
               <button
                 onClick={() => setShowSprintItemsModal(false)}
                 className="px-5 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition-all text-sm"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Task Details and Execution History Modal */}
+      {selectedDetailTask && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
+          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[85vh] flex flex-col shadow-2xl border border-slate-100 animate-scale-up overflow-hidden">
+            {/* Modal Header */}
+            <div className="px-6 py-5 bg-gradient-to-br from-slate-900 to-indigo-950 text-white flex justify-between items-center relative">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl pointer-events-none"></div>
+              <div>
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span className="text-[10px] font-bold font-mono text-indigo-300 bg-white/10 px-2 py-0.5 rounded-md">
+                    {selectedDetailTask.id}
+                  </span>
+                  <StatusBadge status={selectedDetailTask.status} size="sm" />
+                  {selectedDetailTask.priority && (
+                    <span className={`text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                      selectedDetailTask.priority.toLowerCase() === 'high' ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30' :
+                      selectedDetailTask.priority.toLowerCase() === 'medium' ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                      'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                    }`}>
+                      {selectedDetailTask.priority}
+                    </span>
+                  )}
+                </div>
+                <h2 className="text-xl font-bold tracking-tight">{selectedDetailTask.name}</h2>
+              </div>
+              <button 
+                onClick={() => setSelectedDetailTask(null)}
+                className="p-2 bg-white/10 hover:bg-white/20 rounded-xl text-white font-bold transition-colors ml-4 outline-none"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-slate-100 bg-slate-50/50">
+              
+              {/* Left Column: Details & Instructions */}
+              <div className="p-6 space-y-6 overflow-y-auto">
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Original Task / Requirement Description</h3>
+                  <div className="p-4 bg-white border border-slate-200/80 rounded-2xl text-slate-700 text-sm font-medium leading-relaxed whitespace-pre-wrap shadow-sm">
+                    {selectedDetailTask.prompt || 'No description provided.'}
+                  </div>
+                </div>
+
+                {selectedDetailTask.isCustom && selectedDetailTask.rawTask?.test_instructions && (
+                  <div>
+                    <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                      <span className="w-2 h-2 bg-indigo-500 rounded-full animate-pulse"></span>
+                      AI-Generated Test Cases & Instructions
+                    </h3>
+                    <div className="p-4 bg-indigo-50/40 border border-indigo-100 rounded-2xl text-indigo-950 text-sm font-medium leading-relaxed whitespace-pre-wrap shadow-sm font-mono text-xs">
+                      {selectedDetailTask.rawTask.test_instructions}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">Scope Mapping</h3>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="p-3 bg-white border border-slate-200/80 rounded-xl shadow-sm">
+                      <span className="block text-[10px] text-slate-400 font-bold uppercase">Task Origin</span>
+                      <span className="text-sm font-bold text-slate-800 mt-0.5 block">
+                        {selectedDetailTask.isCustom ? 'Manual Local Task' : 'Worker Registry Task'}
+                      </span>
+                    </div>
+                    <div className="p-3 bg-white border border-slate-200/80 rounded-xl shadow-sm">
+                      <span className="block text-[10px] text-slate-400 font-bold uppercase">Target Host / Worker</span>
+                      <span className="text-sm font-bold text-slate-800 mt-0.5 block line-clamp-1">
+                        {selectedDetailTask.workerName || selectedDetailTask.workerId}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Column: Execution History & Actions Timeline */}
+              <div className="p-6 flex flex-col overflow-y-auto">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-4 flex items-center gap-1.5">
+                  <Calendar className="w-4 h-4 text-indigo-600" />
+                  Real-time Execution History & Logs
+                </h3>
+
+                {loadingActions ? (
+                  <div className="flex flex-col items-center justify-center flex-1 py-12 text-slate-400">
+                    <RefreshCw className="w-8 h-8 animate-spin text-indigo-600 mb-3" />
+                    <span className="text-xs font-semibold">Fetching latest execution logs...</span>
+                  </div>
+                ) : taskActionsHistory.length > 0 ? (
+                  <div className="flex-1 space-y-4 pr-1">
+                    {taskActionsHistory.map((action, index) => (
+                      <div key={action.action_id || index} className="flex gap-4 relative">
+                        {/* Timeline Connector Line */}
+                        {index < taskActionsHistory.length - 1 && (
+                          <div className="absolute left-3 top-6 bottom-0 w-0.5 bg-indigo-100"></div>
+                        )}
+                        
+                        {/* Status Dot */}
+                        <div className={`w-6 h-6 rounded-full flex-shrink-0 flex items-center justify-center z-10 ${
+                          action.status === 'success' ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' :
+                          action.status === 'failed' ? 'bg-rose-50 text-rose-600 border border-rose-200' :
+                          'bg-indigo-50 text-indigo-600 border border-indigo-200'
+                        }`}>
+                          <span className="w-2.5 h-2.5 rounded-full bg-current"></span>
+                        </div>
+
+                        {/* Action Content */}
+                        <div className="flex-1 bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm">
+                          <div className="flex justify-between items-start gap-2 mb-1">
+                            <span className="text-xs font-bold text-slate-800 uppercase tracking-wide">
+                              {action.action_type || 'Run Step'}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-medium">
+                              {action.created_at ? new Date(action.created_at).toLocaleTimeString() : ''}
+                            </span>
+                          </div>
+                          {action.details && (
+                            <p className="text-xs font-medium text-slate-600 leading-relaxed mt-1">
+                              {action.details}
+                            </p>
+                          )}
+                          {action.screenshot_url && (
+                            <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 shadow-sm max-w-[200px]">
+                              <img src={action.screenshot_url} alt="Action step screenshot" className="w-full h-auto object-cover max-h-[120px]" />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center flex-1 py-16 text-center text-slate-400 bg-white border border-dashed border-slate-200/60 rounded-3xl p-6 shadow-inner">
+                    <CheckCircle2 className="w-12 h-12 text-slate-200 mb-3" />
+                    <h4 className="font-bold text-slate-800 text-sm">
+                      {selectedDetailTask.status === 'Testing Going' ? 'Agent Actively Testing' : 'Awaiting Execution'}
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-1.5 max-w-xs leading-relaxed">
+                      {selectedDetailTask.status === 'Testing Going' 
+                        ? 'Worker Agent is running page validations. Live steps will render here as soon as they report.' 
+                        : selectedDetailTask.status === 'TODO' 
+                        ? 'Task is queued in TODO column. Click "Start Brain Agent" to trigger AI planning.'
+                        : selectedDetailTask.status === 'Test Case Ready'
+                        ? 'AI has successfully pre-planned test instructions. Awaiting online worker registry scheduling.'
+                        : 'No standard execution logs recorded for this task.'}
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-6 py-4 bg-slate-100 border-t border-slate-200/60 flex justify-between items-center">
+              <span className="text-[11px] text-slate-400 font-medium">
+                {selectedDetailTask.isCustom && selectedDetailTask.rawTask?.updated_at 
+                  ? `Last updated: ${new Date(selectedDetailTask.rawTask.updated_at).toLocaleString()}` 
+                  : 'Sane AI Real-time Tracking.'}
+              </span>
+              <button
+                onClick={() => setSelectedDetailTask(null)}
+                className="px-6 py-2 bg-slate-800 hover:bg-slate-900 text-white font-bold rounded-xl transition-all text-sm outline-none shadow-md"
               >
                 Close
               </button>

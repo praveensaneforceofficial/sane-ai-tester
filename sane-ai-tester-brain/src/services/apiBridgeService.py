@@ -264,6 +264,9 @@ class APIBridgeService:
     async def update_custom_task_status(self, custom_task_id: str, status: str) -> Dict:
         return await api_rest_client.put(f"/api/custom-tasks/{custom_task_id}/status", {"status": status})
     
+    async def update_custom_task(self, custom_task_id: str, task_data: Dict) -> Dict:
+        return await api_rest_client.put(f"/api/custom-tasks/{custom_task_id}", task_data)
+    
     async def delete_custom_task(self, custom_task_id: str) -> Dict:
         return await api_rest_client.delete(f"/api/custom-tasks/{custom_task_id}")
 

@@ -34,6 +34,21 @@ class CustomTaskRepository {
         return result.rows[0];
     }
 
+    async update(customTaskId, updateData) {
+        const fields = [];
+        const values = [];
+        let idx = 1;
+        for (const [key, val] of Object.entries(updateData)) {
+            fields.push(`${key} = $${idx}`);
+            values.push(val);
+            idx++;
+        }
+        values.push(customTaskId);
+        const query = `UPDATE custom_tasks SET ${fields.join(', ')}, updated_at = NOW() WHERE custom_task_id = $${idx} RETURNING *`;
+        const result = await db.query(query, values);
+        return result.rows[0];
+    }
+
     async delete(customTaskId) {
         await db.query(`DELETE FROM custom_tasks WHERE custom_task_id = $1`, [customTaskId]);
         return true;
