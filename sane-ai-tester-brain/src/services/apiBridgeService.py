@@ -89,7 +89,8 @@ class APIBridgeService:
         return await api_rest_client.get("/api/projects/active")
     
     async def trigger_zoho_sync(self) -> Dict:
-        return await api_rest_client.post("/api/projects/sync")
+        # Use post_long since Puppeteer can take up to 2 minutes to scrape
+        return await api_rest_client.post_long("/api/projects/sync", timeout=180.0)
     
     async def get_projects_by_category(self, category: str) -> List[Dict]:
         return await api_rest_client.get(f"/api/projects/category/{category}")

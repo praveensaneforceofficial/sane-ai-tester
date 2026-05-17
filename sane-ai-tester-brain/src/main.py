@@ -61,6 +61,7 @@ from routes import tasks as tasks_router
 from routes import analytics as analytics_router
 from routes import reports as reports_router
 from routes import health as health_router
+from routes import projects as projects_router
 
 app.include_router(dashboard_router.router, prefix="/api", tags=["Dashboard"])
 app.include_router(auth_router.router, prefix="/api", tags=["Auth"])
@@ -69,6 +70,7 @@ app.include_router(tasks_router.router, prefix="/api", tags=["Tasks"])
 app.include_router(analytics_router.router, prefix="/api", tags=["Analytics"])
 app.include_router(reports_router.router, prefix="/api", tags=["Reports"])
 app.include_router(health_router.router, prefix="/api", tags=["Health"])
+app.include_router(projects_router.router, prefix="/api", tags=["Projects"])
 
 @app.get("/")
 async def root():

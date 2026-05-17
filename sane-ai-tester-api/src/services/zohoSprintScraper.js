@@ -78,47 +78,23 @@ class ZohoSprintScraper {
                 throw new Error("Timeout waiting for project data to load. Make sure you logged in correctly.");
             }
             
-            console.log(`Found ${projectsList.length} projects. Syncing to database...`);
+            console.log(`Found ${projectsList.length} projects. Returning data to client...`);
             await browser.close();
 
-            let syncCount = 0;
-            // Iterate and upsert projects
-            for (const proj of projectsList) {
-                // Fallbacks if structure names differ
-                const jobId = proj.id || proj.projectJobjId || proj.projectId || `zoho-${Math.random().toString(36).substr(2, 9)}`;
-                const name = proj.name || proj.projectName || proj.title || 'Untitled Zoho Project';
-                
-                try {
-                    // Check if project exists
-                    const existingProject = await projectRepository.findById(jobId);
-                    
-                    if (existingProject) {
-                        await projectRepository.update(jobId, {
-                            project_name: name,
-                            category: 'zohosprint',
-                            active_flag: true,
-                            metadata: proj // store raw data
-                        });
-                        await projectRepository.updateSyncTime(jobId);
-                    } else {
-                        await projectRepository.create({
-                            project_jobj_id: jobId,
-                            project_name: name,
-                            category: 'zohosprint',
-                            description: proj.description || '',
-                            metadata: proj // store raw data
-                        });
-                    }
-                    syncCount++;
-                } catch (dbErr) {
-                    console.error(`Failed to sync project ${name}: `, dbErr.message);
-                }
-            }
+            // Map and return projects
+            const formattedProjects = projectsList.map(proj => {
+                return {
+                    id: proj.id || proj.projectJobjId || proj.projectId || `zoho-${Math.random().toString(36).substr(2, 9)}`,
+                    name: proj.name || proj.projectName || proj.title || 'Untitled Zoho Project',
+                    description: proj.description || ''
+                };
+            });
 
             return {
                 success: true,
-                message: `Synced ${syncCount} projects from Zoho Sprints.`,
-                raw_count: projectsList.length
+                message: `Successfully scraped ${formattedProjects.length} projects from Zoho Sprints.`,
+                raw_count: projectsList.length,
+                projects: formattedProjects
             };
 
         } catch (error) {

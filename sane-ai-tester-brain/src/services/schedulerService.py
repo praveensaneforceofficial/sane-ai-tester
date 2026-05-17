@@ -17,14 +17,14 @@ def start_scheduler():
     from scheduler.jobs.task_retrier import retry_failed_tasks
     from scheduler.jobs.analytics_updater import update_analytics
     
-    # Add jobs
-    scheduler.add_job(
-        func=poll_zoho_sprint,
-        trigger=IntervalTrigger(seconds=settings.ZOHO_POLL_INTERVAL),
-        id='zoho_poller',
-        name='Poll Zoho Sprint for updates',
-        replace_existing=True
-    )
+    # Disable auto polling for Zoho
+    # scheduler.add_job(
+    #     func=poll_zoho_sprint,
+    #     trigger=IntervalTrigger(seconds=settings.ZOHO_POLL_INTERVAL),
+    #     id='zoho_poller',
+    #     name='Poll Zoho Sprint for updates',
+    #     replace_existing=True
+    # )
     
     scheduler.add_job(
         func=check_worker_health,

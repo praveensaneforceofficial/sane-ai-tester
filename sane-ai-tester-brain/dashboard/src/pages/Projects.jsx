@@ -9,9 +9,13 @@ function Projects() {
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
   const [syncModalOpen, setSyncModalOpen] = useState(false)
+  const [showPreviewModal, setShowPreviewModal] = useState(false)
+  const [scrapedProjects, setScrapedProjects] = useState([])
+  const [cachedZohoProjects, setCachedZohoProjects] = useState([])
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     project_name: '',
+    project_jobj_id: '',
     category: 'custom',
     test_type: 'web',
     mobile_platform: [],
@@ -20,6 +24,10 @@ function Projects() {
 
   useEffect(() => {
     fetchProjects()
+    const cache = localStorage.getItem('zohoSprintCache')
+    if (cache) {
+      setCachedZohoProjects(JSON.parse(cache))
+    }
   }, [])
 
   const fetchProjects = async () => {
@@ -44,15 +52,24 @@ function Projects() {
 
   const handleSync = async () => {
     try {
-      await projectApi.sync()
-      toast.success('Projects synced successfully', { id: 'sync' })
-      fetchProjects()
+      const response = await projectApi.sync()
+      const extractedProjects = response.projects || []
+      setScrapedProjects(extractedProjects)
+      setShowPreviewModal(true)
+      toast.success(`Successfully scraped ${extractedProjects.length} projects!`, { id: 'sync' })
     } catch (error) {
       const errorMsg = error.response?.data?.error || error.message || 'Failed to sync projects'
       toast.error(errorMsg, { id: 'sync' })
     } finally {
       setSyncModalOpen(false)
     }
+  }
+
+  const saveScrapedProjects = () => {
+    localStorage.setItem('zohoSprintCache', JSON.stringify(scrapedProjects))
+    setCachedZohoProjects(scrapedProjects)
+    toast.success('Saved to local browser cache!')
+    setShowPreviewModal(false)
   }
 
   const handleCreateProject = async (e) => {
@@ -66,12 +83,14 @@ function Projects() {
       setIsSubmitting(true)
       const projectPayload = {
         ...formData,
-        project_jobj_id: `local-${Date.now()}` // Generate local ID
+        project_jobj_id: formData.category === 'zohosprint' && formData.project_jobj_id 
+                         ? formData.project_jobj_id 
+                         : `local-${Date.now()}` // Generate local ID if custom
       }
       await projectApi.create(projectPayload)
       toast.success('Project created successfully')
       setShowModal(false)
-      setFormData({ project_name: '', category: 'custom', test_type: 'web', mobile_platform: [], description: '' })
+      setFormData({ project_name: '', project_jobj_id: '', category: 'custom', test_type: 'web', mobile_platform: [], description: '' })
       fetchProjects()
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to create project')
@@ -164,17 +183,49 @@ function Projects() {
             <h2 className="text-xl font-bold text-gray-900 mb-4">Create New Project</h2>
             
             <form onSubmit={handleCreateProject} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Project Name <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  required
-                  value={formData.project_name}
-                  onChange={(e) => setFormData({...formData, project_name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
-                  placeholder="e.g., E-Commerce Regression"
-                />
-              </div>
+              {formData.category === 'custom' ? (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Project Name <span className="text-red-500">*</span></label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.project_name}
+                    onChange={(e) => setFormData({...formData, project_name: e.target.value})}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    placeholder="e.g., E-Commerce Regression"
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Select Zoho Project <span className="text-red-500">*</span></label>
+                  <select
+                    required
+                    value={formData.project_jobj_id || ''}
+                    onChange={(e) => {
+                      const selectedId = e.target.value;
+                      const selectedProj = cachedZohoProjects.find(p => String(p.id) === String(selectedId));
+                      if (selectedProj) {
+                        setFormData({
+                          ...formData,
+                          project_jobj_id: selectedProj.id,
+                          project_name: selectedProj.name
+                        });
+                      } else {
+                        setFormData({...formData, project_jobj_id: '', project_name: ''});
+                      }
+                    }}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                  >
+                    <option value="" disabled>-- Select a Project from Local Cache --</option>
+                    {cachedZohoProjects.map(proj => (
+                      <option key={proj.id} value={proj.id}>{proj.name} (ID: {proj.id})</option>
+                    ))}
+                  </select>
+                  {cachedZohoProjects.length === 0 && (
+                    <p className="mt-1 text-xs text-amber-600">No cached projects. Please click 'Sync Zoho' first.</p>
+                  )}
+                </div>
+              )}
               
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Category</label>
@@ -284,6 +335,57 @@ function Projects() {
                 className="px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors w-full shadow-sm"
               >
                 Cancel / Hide
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Scraped Projects Preview Modal */}
+      {showPreviewModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-2xl max-h-[80vh] flex flex-col animate-fade-in-up">
+            <div className="px-6 py-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-800">Scraped Zoho Projects</h3>
+                <p className="text-sm text-gray-500">Found {scrapedProjects.length} projects</p>
+              </div>
+              <button 
+                onClick={() => setShowPreviewModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 overflow-y-auto flex-1">
+              {scrapedProjects.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">No projects were extracted.</div>
+              ) : (
+                <ul className="space-y-3">
+                  {scrapedProjects.map((proj, idx) => (
+                    <li key={idx} className="p-3 bg-gray-50 border border-gray-100 rounded-lg flex justify-between items-center">
+                      <span className="font-medium text-gray-800">{proj.name}</span>
+                      <span className="text-xs text-gray-500 font-mono bg-white px-2 py-1 rounded border border-gray-200">ID: {proj.id}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-100 flex justify-end gap-3 bg-gray-50 rounded-b-xl">
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 shadow-sm"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveScrapedProjects}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm"
+              >
+                Done (Save to Browser Cache)
               </button>
             </div>
           </div>

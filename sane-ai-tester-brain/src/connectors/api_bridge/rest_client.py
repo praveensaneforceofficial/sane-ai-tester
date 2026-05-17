@@ -39,6 +39,20 @@ class APIRestClient:
             logger.error(f"POST {endpoint} failed: {e}")
             raise
 
+    async def post_long(self, endpoint: str, data: Optional[Dict] = None, timeout: float = 180.0) -> Any:
+        """POST request with extended timeout for long-running operations like Puppeteer"""
+        try:
+            url = f"{self.base_url}{endpoint}"
+            async with httpx.AsyncClient(timeout=timeout) as long_client:
+                response = await long_client.post(url, json=data)
+                response.raise_for_status()
+                self.is_connected = True
+                return response.json()
+        except Exception as e:
+            self.is_connected = False
+            logger.error(f"POST_LONG {endpoint} failed: {e}")
+            raise
+
     async def put(self, endpoint: str, data: Optional[Dict] = None) -> Any:
         """PUT request to API bridge"""
         try:
