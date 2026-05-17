@@ -254,6 +254,19 @@ class APIBridgeService:
     async def refresh_system_status(self) -> Dict:
         return await api_rest_client.post("/api/refresh-status")
 
+    # --- Custom Task Methods ---
+    async def get_all_custom_tasks(self) -> List[Dict]:
+        return await api_rest_client.get("/api/custom-tasks")
+    
+    async def create_custom_task(self, task_data: Dict) -> Dict:
+        return await api_rest_client.post("/api/custom-tasks", task_data)
+    
+    async def update_custom_task_status(self, custom_task_id: str, status: str) -> Dict:
+        return await api_rest_client.put(f"/api/custom-tasks/{custom_task_id}/status", {"status": status})
+    
+    async def delete_custom_task(self, custom_task_id: str) -> Dict:
+        return await api_rest_client.delete(f"/api/custom-tasks/{custom_task_id}")
+
     # --- WebSocket Emitters (Real-time) ---
     async def emit_task_assign(self, worker_id: str, task_id: str, url: str, prompt: str):
         await api_ws_client.assign_task(worker_id, task_id, url, prompt)
