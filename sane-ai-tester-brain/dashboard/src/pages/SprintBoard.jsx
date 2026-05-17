@@ -38,7 +38,7 @@ function SprintBoard() {
   const [loadingItems, setLoadingItems] = useState(false)
   const [isCachedData, setIsCachedData] = useState(false)
   const [zohoBoardUrl, setZohoBoardUrl] = useState('')
-  const [minimizeZohoPanel, setMinimizeZohoPanel] = useState(false)
+  const [minimizeZohoPanel, setMinimizeZohoPanel] = useState(true)
   const [loadingBrainAgent, setLoadingBrainAgent] = useState(false)
   const [selectedDetailTask, setSelectedDetailTask] = useState(null)
   const [taskActionsHistory, setTaskActionsHistory] = useState([])
@@ -546,35 +546,35 @@ function SprintBoard() {
           <button
             onClick={handleStartBrainAgent}
             disabled={loadingBrainAgent}
-            className={`flex items-center gap-2 px-4.5 py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white text-sm font-bold rounded-xl transition-all shadow-md hover:shadow-lg ${
+            className={`relative group overflow-hidden flex items-center gap-2 px-6 py-2.5 bg-gradient-to-r from-indigo-500 via-purple-600 to-pink-500 hover:from-indigo-600 hover:via-purple-700 hover:to-pink-600 text-white text-xs font-black tracking-widest uppercase rounded-xl transition-all duration-300 shadow-[0_4px_18px_rgba(99,102,241,0.25)] hover:shadow-[0_6px_25px_rgba(99,102,241,0.45)] hover:scale-[1.03] active:scale-[0.97] border border-white/10 ${
               loadingBrainAgent ? 'opacity-70 cursor-not-allowed' : ''
             }`}
           >
-            <Play className={`w-4 h-4 ${loadingBrainAgent ? 'animate-spin' : ''}`} />
-            {loadingBrainAgent ? 'Running Brain Agent...' : 'Start Brain Agent'}
+            <Play className={`w-3.5 h-3.5 relative z-10 transition-transform group-hover:scale-110 ${loadingBrainAgent ? 'animate-spin' : ''}`} />
+            <span className="relative z-10">{loadingBrainAgent ? 'Running Brain Agent...' : 'Start Brain Agent'}</span>
           </button>
         </div>
       </div>
 
       {/* Kanban Board */}
-      <div className="flex gap-6 overflow-x-auto pb-6 scrollbar-thin">
+      <div className="flex gap-3.5 overflow-x-auto pb-6 scrollbar-thin">
         {statusColumns.map((status) => (
           <div
             key={status}
-            className="flex-shrink-0 w-80 bg-slate-50 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col"
+            className="flex-shrink-0 w-[245px] bg-slate-50 rounded-2xl border border-slate-200/60 shadow-sm flex flex-col"
             onDragOver={handleDragOver}
             onDrop={() => handleDrop(status)}
           >
             {/* Column Header */}
-            <div className="p-4 border-b border-slate-200/80 bg-white/50 rounded-t-2xl flex items-center justify-between">
-              <h3 className="font-bold text-slate-800 text-sm tracking-wide">{status}</h3>
-              <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
+            <div className="p-3 border-b border-slate-200/85 bg-white/55 rounded-t-2xl flex items-center justify-between">
+              <h3 className="font-extrabold text-slate-600 text-[11px] tracking-wider uppercase">{status}</h3>
+              <span className="text-[10px] font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
                 {allBoardTasks.filter(t => t.status === status).length}
               </span>
             </div>
 
             {/* Column Body */}
-            <div className="p-3 space-y-3 flex-1 min-h-[480px]">
+            <div className="p-2.5 space-y-2.5 flex-1 min-h-[480px]">
               {allBoardTasks
                 .filter(task => task.status === status)
                 .map((task) => (
@@ -583,25 +583,25 @@ function SprintBoard() {
                     draggable
                     onDragStart={() => handleDragStart(task)}
                     onClick={() => handleOpenTaskDetails(task)}
-                    className="bg-white p-4 rounded-xl shadow-sm border border-slate-200/80 cursor-pointer hover:shadow-md hover:border-slate-300 transition-all duration-200 relative group"
+                    className="bg-white p-3 rounded-xl shadow-sm border border-slate-200/80 cursor-pointer hover:shadow-md hover:border-slate-300 transition-all duration-200 relative group"
                   >
                     <div className="flex items-start justify-between mb-2">
-                      <span className="text-[10px] font-bold font-mono text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                      <span className="text-[9px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md">
                         {task.id}
                       </span>
-                      <StatusBadge status={task.status} size="sm" />
+                      <StatusBadge status={task.status} size="xs" />
                     </div>
-                    <h4 className="font-bold text-slate-800 text-sm mb-2 line-clamp-2 leading-relaxed">
+                    <h4 className="font-bold text-slate-800 text-[12.5px] mb-2 line-clamp-2 leading-relaxed">
                       {task.name || task.prompt?.substring(0, 50)}
                     </h4>
                     
-                    <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
+                    <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-[11px]">
                       <span className="text-slate-400">{task.isCustom ? 'Project:' : 'Worker:'}</span>
-                      <span className="font-semibold text-slate-700">{task.workerName || task.workerId}</span>
+                      <span className="font-semibold text-slate-600 line-clamp-1 max-w-[120px] text-right">{task.workerName || task.workerId}</span>
                     </div>
 
                     {task.priority && (
-                      <span className={`inline-block mt-3 text-[9px] font-extrabold uppercase px-2 py-0.5 rounded-full ${
+                      <span className={`inline-block mt-2.5 text-[8.5px] font-extrabold uppercase px-1.5 py-0.5 rounded-full ${
                         task.priority.toLowerCase() === 'high' ? 'bg-rose-50 text-rose-600 border border-rose-100' :
                         task.priority.toLowerCase() === 'medium' ? 'bg-amber-50 text-amber-600 border border-amber-100' :
                         'bg-emerald-50 text-emerald-600 border border-emerald-100'
@@ -611,12 +611,12 @@ function SprintBoard() {
                     )}
 
                     {task.status === 'Task Completed' && task.isCustom && (
-                      <div className="mt-3 pt-3 border-t border-slate-100 flex justify-end">
+                      <div className="mt-2.5 pt-2.5 border-t border-slate-100 flex justify-end">
                         <button
                           onClick={(e) => handleArchiveTask(e, task.id)}
-                          className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 hover:border-rose-200 text-slate-500 hover:text-rose-600 text-xs font-bold rounded-lg transition-all shadow-sm hover:shadow"
+                          className="flex items-center gap-1 px-2 py-1 bg-slate-50 hover:bg-rose-50 border border-slate-200/60 hover:border-rose-200 text-slate-500 hover:text-rose-600 text-[10px] font-bold rounded-lg transition-all shadow-sm hover:shadow"
                         >
-                          <Archive className="w-3.5 h-3.5" />
+                          <Archive className="w-3 h-3" />
                           Archive Task
                         </button>
                       </div>
