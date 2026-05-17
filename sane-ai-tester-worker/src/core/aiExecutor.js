@@ -11,65 +11,109 @@ class AIExecutor {
         this.openaiModel = config.OPENAI_MODEL;
     }
     
+    /**
+     * Legacy parse prompt for static execution (keep for fallback)
+     */
     async parsePrompt(prompt, url) {
-        logger.info("🤖 Parsing AI prompt...");
+        // Fallback functionality
+        return this.getFallbackActions(prompt, url);
+    }
+
+    /**
+     * Generates a raw Puppeteer JavaScript script based on the task prompt/instructions.
+     * @param {string} prompt Test instructions from the brain
+     * @param {string} url Target URL
+     * @returns {Promise<string>} Raw JavaScript code to execute
+     */
+    async generatePuppeteerScript(prompt, url) {
+        logger.info("🧠 Generating dynamic Puppeteer script via AI...");
         
-        const systemPrompt = `You are a test automation expert. Convert the following instruction into Playwright actions.
-        Return ONLY a JSON array of actions. Each action must have a "type" and required parameters.
-        
-        Available action types:
-        - click: needs "selector" (CSS or text selector)
-        - fill/type: needs "selector" and "value"
-        - select: needs "selector" and "value"
-        - wait: needs "value" (milliseconds)
-        - waitForSelector: needs "selector"
-        - hover: needs "selector"
-        - press: needs "selector" (element to press) and "value" (key)
-        - scroll: scrolls page down
-        
-        For login: use selectors like 'input[name="username"]', 'input[name="password"]', 'button[type="submit"]'
-        For navigation: use click with text selectors like 'text=Reports' or 'text=Menu'
-        
-        Example: For "login with username test and password 123", return:
-        [{"type":"fill","selector":"input[name='username']","value":"test"},{"type":"fill","selector":"input[name='password']","value":"123"},{"type":"click","selector":"button[type='submit']"}]
-        
-        Instruction: ${prompt}
-        Target URL: ${url}`;
-        
+        const systemPrompt = `You are a Senior QA Automation Engineer writing a Puppeteer automation script.
+Your task is to convert the user's instructions into raw JavaScript code.
+The code you generate will be executed dynamically inside an AsyncFunction.
+
+AVAILABLE CONTEXT:
+- 'page' : The active Puppeteer Page object. It is already initialized and navigated to the target URL.
+- 'logger' : A logging object with logger.info(), logger.warn(), logger.error().
+
+RULES:
+1. ONLY return the raw JavaScript code to execute the steps. NO markdown formatting, NO \`\`\`javascript blocks, NO explanations.
+2. DO NOT include "const puppeteer = require('puppeteer')" or browser initialization.
+3. Use await page.waitForSelector(), await page.click(), await page.type(), etc.
+4. Add relevant logger.info() statements to document progress.
+5. If you need to search or assert text, use XPath or page.evaluate.
+6. The code must be self-contained and run synchronously.
+
+Example Output format:
+logger.info("Starting execution");
+await page.waitForSelector('input[name="username"]');
+await page.type('input[name="username"]', 'admin');
+await page.click('button[type="submit"]');
+logger.info("Finished");
+`;
+
+        const userPrompt = `Target URL: ${url}\nInstructions: ${prompt}\n\nPlease generate the raw Puppeteer JavaScript code to execute this test scenario.`;
+
         try {
-            let actions = [];
+            let scriptCode = "";
             
-            if (this.aiMode === 'openai' && this.openaiKey) {
-                actions = await this.callOpenAI(systemPrompt);
+            // Prefer OpenAI if configured
+            if (this.openaiKey) {
+                scriptCode = await this.callOpenAI(systemPrompt, userPrompt);
             } else {
-                actions = await this.callOllama(systemPrompt);
+                scriptCode = await this.callOllama(systemPrompt + "\n" + userPrompt);
             }
             
-            // Validate and clean actions
-            if (!Array.isArray(actions)) {
-                logger.warn("AI response not an array, using fallback");
-                actions = this.getFallbackActions(prompt, url);
-            }
+            // Clean up Markdown backticks if AI accidentally includes them
+            scriptCode = scriptCode.replace(/^```javascript\s*/i, '')
+                                   .replace(/^```js\s*/i, '')
+                                   .replace(/^```\s*/, '')
+                                   .replace(/```\s*$/, '');
             
-            logger.info(`✅ Generated ${actions.length} actions`);
-            return actions;
+            logger.info("✅ Successfully generated dynamic script");
+            return scriptCode.trim();
             
         } catch (error) {
-            logger.error(`AI parsing failed: ${error.message}`);
-            return this.getFallbackActions(prompt, url);
+            logger.error(`AI Script Generation failed: ${error.message}`);
+            throw new Error(`Failed to generate test script: ${error.message}`);
+        }
+    }
+
+    /**
+     * Analyzes execution logs and generates a summary report.
+     */
+    async generateSummary(prompt, logs, success) {
+        logger.info("🧠 Generating execution summary via AI...");
+        
+        const systemPrompt = `You are a QA Automation Reporter. 
+Based on the original test instructions and the execution logs provided, generate a concise, human-readable summary of what was tested, whether it succeeded, and any notable issues.
+
+Format your response as a professional summary report (1-3 small paragraphs). No code, just natural language.`;
+
+        const userPrompt = `Test Instructions: ${prompt}\nExecution Success: ${success}\nExecution Logs:\n${logs}`;
+
+        try {
+            if (this.openaiKey) {
+                return await this.callOpenAI(systemPrompt, userPrompt);
+            } else {
+                return await this.callOllama(systemPrompt + "\n" + userPrompt);
+            }
+        } catch (err) {
+            logger.error(`Summary generation failed: ${err.message}`);
+            return success ? "Test executed successfully." : "Test failed during execution. See logs.";
         }
     }
     
-    async callOpenAI(prompt) {
+    async callOpenAI(systemPrompt, userPrompt) {
         try {
             const response = await axios.post('https://api.openai.com/v1/chat/completions', {
                 model: this.openaiModel,
                 messages: [
-                    { role: 'system', content: 'You are a test automation assistant. Return only valid JSON arrays.' },
-                    { role: 'user', content: prompt }
+                    { role: 'system', content: systemPrompt },
+                    { role: 'user', content: userPrompt }
                 ],
-                temperature: 0.3,
-                max_tokens: 2000
+                temperature: 0.2, // Low temperature for code reliability
+                max_tokens: 3000
             }, {
                 headers: {
                     'Authorization': `Bearer ${this.openaiKey}`,
@@ -77,11 +121,10 @@ class AIExecutor {
                 }
             });
             
-            const content = response.data.choices[0].message.content;
-            return this.extractJSON(content);
+            return response.data.choices[0].message.content;
             
         } catch (error) {
-            logger.error(`OpenAI API error: ${error.message}`);
+            logger.error(`OpenAI API error: ${error.response ? JSON.stringify(error.response.data) : error.message}`);
             throw error;
         }
     }
@@ -92,11 +135,10 @@ class AIExecutor {
                 model: this.ollamaModel,
                 prompt: prompt,
                 stream: false,
-                temperature: 0.3
+                temperature: 0.2
             });
             
-            const content = response.data.response;
-            return this.extractJSON(content);
+            return response.data.response;
             
         } catch (error) {
             logger.error(`Ollama API error: ${error.message}`);
@@ -104,82 +146,22 @@ class AIExecutor {
         }
     }
     
-    extractJSON(text) {
-        // Try to extract JSON from response
-        const jsonMatch = text.match(/\[[\s\S]*\]/);
-        if (jsonMatch) {
-            try {
-                return JSON.parse(jsonMatch[0]);
-            } catch (e) {
-                logger.warn(`Failed to parse JSON: ${e.message}`);
-            }
-        }
-        return [];
-    }
-    
     getFallbackActions(prompt, url) {
-        // Basic fallback actions based on keywords
+        // Basic fallback actions
         const actions = [];
-        const lowerPrompt = prompt.toLowerCase();
-        
-        // Navigation
         actions.push({ type: 'wait', value: 2000 });
-        
-        // Login detection
-        if (lowerPrompt.includes('login') || lowerPrompt.includes('sign in')) {
-            actions.push({ type: 'fill', selector: 'input[name="username"], input[type="email"], #username', value: 'testuser' });
-            actions.push({ type: 'fill', selector: 'input[name="password"], input[type="password"], #password', value: 'testpass' });
-            actions.push({ type: 'click', selector: 'button[type="submit"], input[type="submit"], button:has-text("Login"), button:has-text("Sign in")' });
-            actions.push({ type: 'wait', value: 3000 });
-        }
-        
-        // Navigation to reports
-        if (lowerPrompt.includes('report') || lowerPrompt.includes('navigate')) {
-            actions.push({ type: 'click', selector: 'a:has-text("Reports"), button:has-text("Reports"), a:has-text("Report"), button:has-text("Report")' });
-            actions.push({ type: 'wait', value: 2000 });
-        }
-        
-        // Search
-        if (lowerPrompt.includes('search') || lowerPrompt.includes('find')) {
-            actions.push({ type: 'fill', selector: 'input[type="search"], input[name="search"], #search', value: 'test data' });
-            actions.push({ type: 'click', selector: 'button[type="submit"], button:has-text("Search")' });
-            actions.push({ type: 'wait', value: 2000 });
-        }
-        
-        actions.push({ type: 'wait', value: 1000 });
-        
         return actions;
     }
     
     async analyzeError(error, stackTrace) {
-        const analysisPrompt = `Analyze this test automation error and provide:
-        1. Root cause
-        2. Suggested fix
-        3. Prevention measures
-        
-        Error: ${error}
-        Stack Trace: ${stackTrace || 'Not available'}`;
-        
+        const analysisPrompt = `Analyze this test automation error and provide: 1. Root cause 2. Suggested fix\n\nError: ${error}\nStack Trace: ${stackTrace || 'Not available'}`;
         try {
-            if (this.aiMode === 'openai' && this.openaiKey) {
-                const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-                    model: this.openaiModel,
-                    messages: [{ role: 'user', content: analysisPrompt }],
-                    temperature: 0.5
-                }, {
-                    headers: { 'Authorization': `Bearer ${this.openaiKey}` }
-                });
-                return response.data.choices[0].message.content;
+            if (this.openaiKey) {
+                return await this.callOpenAI("You are a QA automation debugger.", analysisPrompt);
             } else {
-                const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
-                    model: this.ollamaModel,
-                    prompt: analysisPrompt,
-                    stream: false
-                });
-                return response.data.response;
+                return await this.callOllama(analysisPrompt);
             }
         } catch (err) {
-            logger.error(`Error analysis failed: ${err.message}`);
             return `Error: ${error}`;
         }
     }
