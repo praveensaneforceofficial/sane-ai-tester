@@ -17,7 +17,7 @@ const mId = machineIdSync();
 
 let currentWorkerData = null;
 let agent = null;
-let currentStatus = 'offline'; // default to offline on startup
+let currentStatus = 'active'; // Default to active for autonomous execution
 let heartbeatInterval = null;
 
 async function startWorker() {
@@ -43,6 +43,9 @@ async function startWorker() {
         if (!agent) {
             agent = new Agent(workerData.workerId, socket, { enableRecording: config.RECORD_VIDEO });
         }
+        
+        // Automatically transition to active/online
+        setStatus('active');
         
         // Start Heartbeat
         if (heartbeatInterval) clearInterval(heartbeatInterval);

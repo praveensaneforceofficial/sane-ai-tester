@@ -322,10 +322,11 @@ class AIOrchestratorService:
                 # Register/create execution task on Node API
                 await api_bridge_service.create_task({
                     "task_id": run_task_id,
-                    "title": f"Run: {title}",
-                    "description": f"AI Directed run for {title}. URL: {extracted_url}",
-                    "status": "pending",
-                    "workerId": worker_id
+                    "worker_id": worker_id,
+                    "prompt": test_instructions or "Perform standard page verification.",
+                    "url": extracted_url,
+                    "priority": task.get("priority", "medium"),
+                    "status": "pending"
                 })
                 
                 # Link custom task to the Node task and save task_id

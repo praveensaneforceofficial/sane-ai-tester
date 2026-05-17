@@ -9,7 +9,7 @@ def check_worker_health():
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-        loop.run_until_complete(api_bridge_service.get_health())
+        loop.run_until_complete(api_bridge_service.get_basic_health())
         loop.close()
     except Exception as e:
         logger.error(f"Error in worker health job: {e}")

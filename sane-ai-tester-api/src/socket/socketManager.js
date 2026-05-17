@@ -82,7 +82,15 @@ class SocketManager {
             }
         });
 
-        // 6. Disconnect
+        // 6. Task Assignment Relay (Brain → API → Worker)
+        socket.on('task:assign', (data) => {
+            const { workerId, taskId, url, prompt } = data;
+            console.log(`📤 Relaying task ${taskId} to worker ${workerId}`);
+            this.io.to(workerId).emit('task:assign', { taskId, url, prompt });
+            this.emitDashboardUpdate();
+        });
+
+        // 7. Disconnect
         socket.on('disconnect', () => {
             console.log('🔴 User disconnected:', socket.id);
         });

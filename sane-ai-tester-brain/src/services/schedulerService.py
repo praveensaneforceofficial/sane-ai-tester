@@ -16,6 +16,7 @@ def start_scheduler():
     from scheduler.jobs.worker_health import check_worker_health
     from scheduler.jobs.task_retrier import retry_failed_tasks
     from scheduler.jobs.analytics_updater import update_analytics
+    from scheduler.jobs.orchestrator_job import run_orchestration
     
     # Disable auto polling for Zoho
     # scheduler.add_job(
@@ -47,6 +48,14 @@ def start_scheduler():
         trigger=IntervalTrigger(minutes=5),
         id='analytics_updater',
         name='Update analytics data',
+        replace_existing=True
+    )
+
+    scheduler.add_job(
+        func=run_orchestration,
+        trigger=IntervalTrigger(seconds=60),
+        id='ai_orchestration',
+        name='Automated AI Orchestration',
         replace_existing=True
     )
     

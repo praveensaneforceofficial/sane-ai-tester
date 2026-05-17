@@ -132,22 +132,23 @@ function Agents() {
             </div>
 
             {/* Connecting SVG Curves */}
-            <div className="absolute inset-x-0 top-[136px] h-[70px] pointer-events-none z-0">
-              <svg className="w-full h-full overflow-visible">
+            <div className="absolute inset-x-0 top-[130px] h-[85px] pointer-events-none z-0">
+              <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
                 {workers.map((w, idx) => {
-                  const startX = "50%";
+                  const startX = 50;
                   const startY = 0;
-                  const endX = `${((idx + 0.5) / workers.length) * 100}%`;
-                  const endY = 70;
-                  const pathD = `M ${startX} ${startY} C ${startX} ${startY + 30}, ${endX} ${endY - 30}, ${endX} ${endY}`;
+                  const endX = ((idx + 0.5) / workers.length) * 100;
+                  const endY = 100;
+                  const pathD = `M ${startX} ${startY} C ${startX} ${startY + 40}, ${endX} ${endY - 40}, ${endX} ${endY}`;
                   return (
                     <path
                       key={w.worker_id}
                       d={pathD}
                       fill="none"
-                      stroke="#E2E8F0"
+                      stroke="#CBD5E1"
                       strokeWidth="2"
-                      className="transition-all duration-300"
+                      vectorEffect="non-scaling-stroke"
+                      className="transition-all duration-300 opacity-60"
                     />
                   );
                 })}
