@@ -8,10 +8,13 @@ function Projects() {
   const [projects, setProjects] = useState([])
   const [loading, setLoading] = useState(true)
   const [showModal, setShowModal] = useState(false)
+  const [syncModalOpen, setSyncModalOpen] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     project_name: '',
-    category: 'local',
+    category: 'custom',
+    test_type: 'web',
+    mobile_platform: [],
     description: ''
   })
 
@@ -34,14 +37,21 @@ function Projects() {
     }
   }
 
+  const handleSyncClick = () => {
+    setSyncModalOpen(true)
+    handleSync()
+  }
+
   const handleSync = async () => {
     try {
-      toast.loading('Syncing Zoho projects...', { id: 'sync' })
       await projectApi.sync()
       toast.success('Projects synced successfully', { id: 'sync' })
       fetchProjects()
     } catch (error) {
-      toast.error('Failed to sync projects', { id: 'sync' })
+      const errorMsg = error.response?.data?.error || error.message || 'Failed to sync projects'
+      toast.error(errorMsg, { id: 'sync' })
+    } finally {
+      setSyncModalOpen(false)
     }
   }
 
@@ -61,7 +71,7 @@ function Projects() {
       await projectApi.create(projectPayload)
       toast.success('Project created successfully')
       setShowModal(false)
-      setFormData({ project_name: '', category: 'local', description: '' })
+      setFormData({ project_name: '', category: 'custom', test_type: 'web', mobile_platform: [], description: '' })
       fetchProjects()
     } catch (error) {
       toast.error(error.response?.data?.error || 'Failed to create project')
@@ -82,7 +92,7 @@ function Projects() {
         </div>
         <div className="flex items-center gap-3">
           <button 
-            onClick={handleSync}
+            onClick={handleSyncClick}
             className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors shadow-sm"
           >
             Sync Zoho
@@ -173,12 +183,59 @@ function Projects() {
                   onChange={(e) => setFormData({...formData, category: e.target.value})}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
                 >
-                  <option value="local">Local Project</option>
+                  <option value="custom">Custom Project</option>
                   <option value="zohosprint">Zoho Sprint</option>
-                  <option value="web">Web Automation</option>
-                  <option value="mobile">Mobile Automation</option>
                 </select>
               </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Test Type</label>
+                <select
+                  value={formData.test_type}
+                  onChange={(e) => setFormData({...formData, test_type: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"
+                >
+                  <option value="web">Web</option>
+                  <option value="app">App</option>
+                  <option value="both">Both</option>
+                </select>
+              </div>
+
+              {(formData.test_type === 'app' || formData.test_type === 'both') && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Mobile Platform</label>
+                  <div className="flex gap-4">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.mobile_platform.includes('android')}
+                        onChange={(e) => {
+                          const newPlatforms = e.target.checked 
+                            ? [...formData.mobile_platform, 'android']
+                            : formData.mobile_platform.filter(p => p !== 'android');
+                          setFormData({...formData, mobile_platform: newPlatforms});
+                        }}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-700">Android</span>
+                    </label>
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={formData.mobile_platform.includes('ios')}
+                        onChange={(e) => {
+                          const newPlatforms = e.target.checked 
+                            ? [...formData.mobile_platform, 'ios']
+                            : formData.mobile_platform.filter(p => p !== 'ios');
+                          setFormData({...formData, mobile_platform: newPlatforms});
+                        }}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-700">iOS</span>
+                    </label>
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -208,6 +265,27 @@ function Projects() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Zoho Sync Progress Modal */}
+      {syncModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-xl shadow-lg w-full max-w-sm overflow-hidden animate-fade-in-up">
+            <div className="p-8 flex flex-col items-center justify-center text-center">
+              <div className="w-16 h-16 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin mb-6 shadow-sm"></div>
+              <h3 className="text-xl font-bold text-gray-800 mb-2">Syncing Zoho Sprints</h3>
+              <p className="text-sm text-gray-500 mb-8 leading-relaxed">
+                A browser automation window has opened. Please log in if prompted.<br/><br/>
+                <span className="font-medium text-blue-600">Waiting for data extraction...</span>
+              </p>
+              <button
+                onClick={() => setSyncModalOpen(false)}
+                className="px-4 py-2.5 text-sm font-semibold text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 hover:text-gray-900 transition-colors w-full shadow-sm"
+              >
+                Cancel / Hide
+              </button>
+            </div>
           </div>
         </div>
       )}

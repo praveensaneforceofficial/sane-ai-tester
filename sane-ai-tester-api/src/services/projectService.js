@@ -40,10 +40,10 @@ class ProjectService {
     }
 
     async syncZoho() {
-        // Placeholder for Zoho API integration
-        // In a real scenario, this would call Zoho Projects API and update the local DB
-        console.log('Syncing Zoho Projects...');
-        return { success: true, message: 'Zoho projects sync started' };
+        const zohoSprintScraper = require('./zohoSprintScraper');
+        console.log('Syncing Zoho Projects via Scraper...');
+        const result = await zohoSprintScraper.scrapeProjects();
+        return result;
     }
 }
 

@@ -68,8 +68,9 @@ class ProjectController {
         try {
             const result = await projectService.syncZoho();
             res.json(result);
-        } catch (err) {
-            res.status(500).json({ error: err.message });
+        } catch (error) {
+            console.error('Error syncing Zoho projects:', error);
+            res.status(500).json({ error: error.message });
         }
     }
 }

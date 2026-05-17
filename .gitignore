@@ -221,3 +221,6 @@ recordings/
 .DS_Store
 dist/
 electron-build/
+sane-ai-tester-api/zoho_session/
+
+*.pyc

@@ -61,7 +61,7 @@ export const taskApi = {
 export const projectApi = {
   getAll: () => api.get('/projects'),
   getActive: () => api.get('/projects/active'),
-  sync: () => api.post('/projects/sync'),
+  sync: () => api.post('/projects/sync', {}, { timeout: 180000 }), // 3 minutes timeout
   create: (data) => api.post('/projects', data),
 }
 
