@@ -137,23 +137,9 @@ class AIOrchestratorService:
             return {"error": f"Failed to fetch workers/tasks: {str(e)}"}
 
         # ----------------------------------------------------
-        # Phase 1: Process TODO tasks
+        # Phase 1: Process TODO tasks (Validate details enough)
         # ----------------------------------------------------
         todo_tasks = [t for t in all_custom_tasks if t.get('status', '').lower() in ('todo', 'pending')]
-        
-        # If no agents are online, keep TODO tasks in TODO, wait for agents to come online.
-        if not workers:
-            logger.info("No online workers available. Waiting for agents to come online.")
-            for task in todo_tasks:
-                title = task.get('title')
-                summary_results["messages"].append(f"Task '{title}': Waiting for an online worker agent.")
-            # Skip processing todo_tasks since we have no agents
-            todo_tasks = []
-
-        agents_desc = []
-        for w in workers:
-            agents_desc.append(f"- Nickname: {w.get('nickname')}, ID: {w.get('worker_id')}, Type: {w.get('worker_type')}, Status: {w.get('status')}")
-        agents_str = "\n".join(agents_desc) if agents_desc else "No online agents"
 
         for task in todo_tasks:
             summary_results["processed_todo"] += 1
@@ -162,32 +148,24 @@ class AIOrchestratorService:
             description = task.get('description', '')
             priority = task.get('priority', 'medium')
             
-            logger.info(f"Brain Agent processing TODO task: {title} ({task_id})")
+            logger.info(f"Brain Agent checking if TODO task has enough details: {title} ({task_id})")
 
-            # Ask LLM if the task is testable given online agents, extract testing URL and write instructions
+            # Ask LLM if the description has enough details to test a web page
             prompt = f"""
-            You are an AI Brain QA Director.
-            We have a manual local task that we want to test:
+            You are an AI QA Evaluator.
+            We have a task description submitted by a user for web page testing:
             Task Title: {title}
             Task Description: {description}
-            Task Priority: {priority}
-            
-            Currently online worker agents:
-            {agents_str}
             
             Your job is to determine:
-            1. Is this task able to be tested? (For example: if it requires mobile platforms but only Web agents are online, or if the description is completely invalid, it is NOT testable. If it's a standard web URL/page test and we have online Web agents, it IS testable.)
-            2. If NOT testable, state the clear, concise failure reason (e.g., "Mobile can't test because no mobile agents are online" or "Invalid instructions").
-            3. If YES (testable):
-               - Extract the URL to test from the description.
-               - Generate a step-by-step Test Case / Test Instructions for testing this web page (specifically target the URL or instruction details in the description).
+            Is this description clear enough and does it contain enough details (like a URL/page to test and what to do) to test a web page?
+            For example, if there is no URL or the instructions are completely blank or nonsensical, it is NOT enough details.
+            If it has a URL (or clear local reference) and basic instructions, it IS enough details.
             
             Respond STRICTLY in JSON format with these exact keys:
             {{
-                "testable": true/false (boolean),
-                "url": "extracted test URL string if testable, otherwise empty",
-                "reason": "failure reason string if not testable, otherwise empty",
-                "test_cases": "concise step-by-step test instructions string if testable, otherwise empty"
+                "enough_details": true/false (boolean),
+                "reason": "if not enough details, state a clear concise explanation, otherwise empty"
             }}
             """
 
@@ -206,13 +184,13 @@ class AIOrchestratorService:
                 clean_json = response_content.strip().replace("```json", "").replace("```", "").strip()
                 result = json.loads(clean_json)
             except Exception as e:
-                logger.error(f"Failed to analyze task {task_id} with AI: {e}")
-                result = {"testable": False, "url": "", "reason": f"AI service failure: {str(e)}", "test_cases": ""}
+                logger.error(f"Failed to analyze task {task_id} details with AI: {e}")
+                result = {"enough_details": False, "reason": f"AI service failure: {str(e)}"}
 
-            if not result.get("testable", False):
-                # Move to Task Completed with fail due to reason
-                reason = result.get("reason", "Not testable by current agents")
-                new_desc = f"[FAILED: {reason}]\n\n{description}"
+            if not result.get("enough_details", False):
+                # Move to Task Completed with fail due to lack of details
+                reason = result.get("reason", "Not enough details to test")
+                new_desc = f"[FAILED: Not enough details to test. Reason: {reason}]\n\n{description}"
                 
                 try:
                     await api_bridge_service.update_custom_task(task_id, {
@@ -220,82 +198,109 @@ class AIOrchestratorService:
                         "description": new_desc
                     })
                     summary_results["failed_todo"] += 1
-                    summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: {reason}")
+                    summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: Not enough details")
                 except Exception as ex:
                     logger.error(f"Failed to update task {task_id} to COMPLETED: {ex}")
             else:
-                # Testable! Write test case and move to Test Case Ready
-                test_cases_str = result.get("test_cases", "Perform full verification.")
-                extracted_url = result.get("url", "")
-                
+                # Enough details! Move to Test Case Ready
                 try:
-                    # Update task with test instructions and status = 'Test Case Ready'
                     await api_bridge_service.update_custom_task(task_id, {
-                        "status": "Test Case Ready",
-                        "test_instructions": test_cases_str
+                        "status": "Test Case Ready"
                     })
                     summary_results["test_case_ready"] += 1
+                    summary_results["messages"].append(f"Task '{title}' has enough details. Moved to TEST CASE READY")
                     logger.info(f"Task '{title}' moved to Test Case Ready")
-
-                    # Check available agent
-                    available_workers = [w for w in workers if w.get('status') == 'online']
-                    if available_workers:
-                        # Select first available worker
-                        assigned_worker = available_workers[0]
-                        worker_id = assigned_worker.get('worker_id')
-                        worker_name = assigned_worker.get('nickname')
-
-                        # We create a standard runner task in Node to link to
-                        timestamp_ms = int(time.time() * 1000)
-                        clean_numeric_id = task_id.replace('CT-', '')
-                        run_task_id = f"task-{clean_numeric_id}-{timestamp_ms}"
-                        
-                        # Register/create execution task on Node API
-                        await api_bridge_service.create_task({
-                            "task_id": run_task_id,
-                            "title": f"Run: {title}",
-                            "description": f"AI Directed run for {title}. URL: {extracted_url}",
-                            "status": "pending",
-                            "workerId": worker_id
-                        })
-                        
-                        # Link custom task to the Node task and update status to Testing Going
-                        await api_bridge_service.update_custom_task(task_id, {
-                            "status": "Testing Going",
-                            "task_id": run_task_id
-                        })
-                        
-                        # Assign and emit to worker!
-                        await api_bridge_service.emit_task_assign(
-                            worker_id=worker_id,
-                            task_id=run_task_id,
-                            url=extracted_url or "https://dev.saneforce.com/",
-                            prompt=test_cases_str
-                        )
-                        
-                        summary_results["testing_going"] += 1
-                        summary_results["messages"].append(f"Task '{title}' assigned to agent '{worker_name}' under status TESTING GOING")
-                    else:
-                        summary_results["messages"].append(f"Task '{title}' moved to TEST CASE READY. Waiting for an online agent to execute.")
                 except Exception as ex:
-                    logger.error(f"Failed to execute test assignment workflow for task {task_id}: {ex}")
+                    logger.error(f"Failed to update task {task_id} to Test Case Ready: {ex}")
 
         # ----------------------------------------------------
-        # Phase 1.5: Process tasks in status 'Test Case Ready'
+        # Phase 2: Process tasks in status 'Test Case Ready' (Write Test Cases & Move to Testing Going)
         # ----------------------------------------------------
         ready_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Test Case Ready']
-        available_workers = [w for w in workers if w.get('status') == 'online']
         
         for task in ready_tasks:
-            if not available_workers:
-                summary_results["messages"].append(f"Task '{task.get('title')}': waiting for an online agent to become available.")
-                break  # No more available workers left
-                
             task_id = task.get('custom_task_id')
             title = task.get('title')
             description = task.get('description', '')
+            
+            logger.info(f"Brain Agent generating test cases for Test Case Ready task: {title} ({task_id})")
+
+            # Ask LLM to generate test instructions
+            prompt = f"""
+            You are an AI QA Engineer.
+            We have a validated task that is ready for test case writing:
+            Task Title: {title}
+            Task Description: {description}
+            
+            Your job is to generate a comprehensive set of step-by-step test cases/scenarios to test this web page (specifying any target URLs or login steps mentioned in the description).
+            
+            Respond STRICTLY in JSON format with these exact keys:
+            {{
+                "test_instructions": "clear step-by-step test instructions and possible scenarios string",
+                "url": "the extracted test URL string to open"
+            }}
+            """
+
+            messages = [
+                {"role": "system", "content": "You are a JSON-only AI responder. Do not include markdown code block formatting in your response. Output pure JSON."},
+                {"role": "user", "content": prompt}
+            ]
+
+            try:
+                # Use OpenAI if API key is present, otherwise fallback to Ollama
+                if settings.OPENAI_API_KEY:
+                    response_content = await openai_client.chat_completion(messages)
+                else:
+                    response_content = await ollama_client.chat_completion(messages)
+
+                clean_json = response_content.strip().replace("```json", "").replace("```", "").strip()
+                result = json.loads(clean_json)
+            except Exception as e:
+                logger.error(f"Failed to write test cases for task {task_id} with AI: {e}")
+                result = {"test_instructions": "Perform standard page verification.", "url": "https://dev.saneforce.com/"}
+
+            test_cases_str = result.get("test_instructions", "Perform standard page verification.")
+            extracted_url = result.get("url", "")
+            
+            try:
+                # Update task with test instructions and status = 'Testing Going'
+                await api_bridge_service.update_custom_task(task_id, {
+                    "status": "Testing Going",
+                    "test_instructions": test_cases_str
+                })
+                summary_results["testing_going"] += 1
+                summary_results["messages"].append(f"Task '{title}': written possible test scenarios. Moved to TESTING GOING.")
+                logger.info(f"Task '{title}' written test cases and moved to Testing Going")
+            except Exception as ex:
+                logger.error(f"Failed to move task {task_id} to Testing Going: {ex}")
+
+        # ----------------------------------------------------
+        # Phase 3: Process unassigned tasks in status 'Testing Going' (Assign to Online Workers)
+        # ----------------------------------------------------
+        # Refresh tasks to check current statuses and assignments
+        try:
+            all_custom_tasks = await api_bridge_service.get_all_custom_tasks()
+        except Exception as e:
+            logger.error(f"Error refreshing tasks for assignment: {e}")
+
+        testing_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Testing Going']
+        available_workers = [w for w in workers if w.get('status') == 'online']
+        
+        for task in testing_tasks:
+            # Check if task is already assigned to a runner
+            if task.get('task_id'):
+                continue # Already assigned
+                
+            title = task.get('title')
+            task_id = task.get('custom_task_id')
+            description = task.get('description', '')
             test_instructions = task.get('test_instructions', '')
             
+            if not available_workers:
+                summary_results["messages"].append(f"Task '{title}': waiting for an online agent to become available.")
+                logger.info(f"No online agents available to assign task {task_id}")
+                continue
+                
             # Select first available worker
             assigned_worker = available_workers.pop(0)
             worker_id = assigned_worker.get('worker_id')
@@ -323,9 +328,8 @@ class AIOrchestratorService:
                     "workerId": worker_id
                 })
                 
-                # Link custom task to the Node task and update status to Testing Going
+                # Link custom task to the Node task and save task_id
                 await api_bridge_service.update_custom_task(task_id, {
-                    "status": "Testing Going",
                     "task_id": run_task_id
                 })
                 
@@ -337,17 +341,23 @@ class AIOrchestratorService:
                     prompt=test_instructions
                 )
                 
-                summary_results["testing_going"] += 1
-                summary_results["messages"].append(f"Task '{title}' assigned to agent '{worker_name}' under status TESTING GOING")
+                summary_results["messages"].append(f"Task '{title}' assigned to agent '{worker_name}' for live execution.")
+                logger.info(f"Task '{title}' successfully assigned to worker {worker_name}")
             except Exception as ex:
-                logger.error(f"Failed to assign ready task {task_id}: {ex}")
+                logger.error(f"Failed to assign testing task {task_id}: {ex}")
 
         # ----------------------------------------------------
-        # Phase 2: Process tasks in status 'Testing Going' -> 'Report Generation'
+        # Phase 4: Process tasks in status 'Testing Going' -> 'Report Generation'
         # ----------------------------------------------------
-        testing_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Testing Going']
+        # Refresh tasks to check if execution completed
+        try:
+            all_custom_tasks = await api_bridge_service.get_all_custom_tasks()
+        except Exception as e:
+            logger.error(f"Error refreshing tasks for report generation check: {e}")
+
+        active_testing_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Testing Going']
         
-        for task in testing_tasks:
+        for task in active_testing_tasks:
             task_id = task.get('custom_task_id')
             title = task.get('title')
             node_task_id = task.get('task_id')
@@ -393,8 +403,14 @@ class AIOrchestratorService:
                 logger.error(f"Error checking report for task {node_task_id}: {e}")
 
         # ----------------------------------------------------
-        # Phase 3: Process tasks in status 'Report Generation' -> 'Task Completed'
+        # Phase 5: Process tasks in status 'Report Generation' -> 'Task Completed'
         # ----------------------------------------------------
+        # Refresh tasks to check report analysis
+        try:
+            all_custom_tasks = await api_bridge_service.get_all_custom_tasks()
+        except Exception as e:
+            logger.error(f"Error refreshing tasks for evaluation: {e}")
+
         report_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Report Generation']
         
         for task in report_tasks:

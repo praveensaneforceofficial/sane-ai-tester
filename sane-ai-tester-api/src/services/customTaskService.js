@@ -35,6 +35,10 @@ class CustomTaskService {
     async delete(customTaskId) {
         return await customTaskRepository.delete(customTaskId);
     }
+
+    async getActions(customTaskId) {
+        return await customTaskRepository.getActions(customTaskId);
+    }
 }
 
 module.exports = new CustomTaskService();

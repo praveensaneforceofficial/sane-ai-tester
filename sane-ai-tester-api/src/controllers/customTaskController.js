@@ -49,6 +49,16 @@ class CustomTaskController {
             res.status(500).json({ error: err.message });
         }
     }
+
+    async getCustomTaskActions(req, res) {
+        try {
+            const { customTaskId } = req.params;
+            const actions = await customTaskService.getActions(customTaskId);
+            res.json(actions);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
 }
 
 module.exports = new CustomTaskController();
