@@ -10,6 +10,7 @@ class ProjectModel {
         this.createdDate = data.created_date;
         this.activeFlag = data.active_flag;
         this.lastSyncedAt = data.last_synced_at;
+        this.boardId = data.board_id;
         this.metadata = data.metadata;
         this.createdAt = data.created_at;
         this.updatedAt = data.updated_at;
@@ -27,6 +28,7 @@ class ProjectModel {
             created_date: this.createdDate,
             active_flag: this.activeFlag,
             last_synced_at: this.lastSyncedAt,
+            board_id: this.boardId,
             metadata: this.metadata,
             created_at: this.createdAt,
             updated_at: this.updatedAt

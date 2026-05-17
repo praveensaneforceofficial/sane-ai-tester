@@ -63,6 +63,8 @@ export const projectApi = {
   getActive: () => api.get('/projects/active'),
   sync: () => api.post('/projects/sync', {}, { timeout: 180000 }), // 3 minutes timeout
   create: (data) => api.post('/projects', data),
+  update: (projectId, data) => api.put(`/projects/${projectId}`, data),
+  delete: (projectId) => api.delete(`/projects/${projectId}`),
 }
 
 // Analytics endpoints

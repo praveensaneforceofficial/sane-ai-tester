@@ -43,13 +43,31 @@ router.get('/sprints/:projectId/:sprintId/items', async (req, res) => {
 router.get('/sprints/:projectId/:sprintId/board-url', async (req, res) => {
   try {
     const { projectId, sprintId } = req.params;
-    // Compute indices via the service (which re‑fetches the sprint list)
-    const sprintData = await projectService.getSprints(projectId);
-    const sprintIdx = (sprintData.sprints || []).findIndex(s => s.id === sprintId) + 1; // 1‑based
-    // Project index – we need the order of the project within the user's Zoho project list.
-    const allProjects = await projectService.getByCategory('zohosprint');
-    const projectIdx = allProjects.findIndex(p => p.project_jobj_id === projectId) + 1 || 1;
-    const boardUrl = `https://sprints.zoho.in/workspace/sanmedia#P${projectIdx}/board/SP${sprintIdx || 1}`;
+    
+    // 1. Fetch project from database to get the stored board_id column (e.g., "13", "28")
+    const project = await projectService.getById(projectId);
+    const projectIdx = project.board_id || '1';
+    
+    // 2. Compute dynamic sprint index or default to 52
+    let sprintIdx = 52;
+    try {
+      const sprintData = await projectService.getSprints(projectId);
+      const sprints = sprintData.sprints || [];
+      const foundIdx = sprints.findIndex(s => s.id === sprintId);
+      if (foundIdx !== -1) {
+        sprintIdx = foundIdx + 1;
+      } else if (sprintId && sprintId.startsWith('SP')) {
+        const num = parseInt(sprintId.replace('SP', ''), 10);
+        if (!isNaN(num)) sprintIdx = num;
+      } else {
+        const num = parseInt(sprintId, 10);
+        if (!isNaN(num)) sprintIdx = num;
+      }
+    } catch (e) {
+      console.warn('Could not compute dynamic sprint index, using default 52:', e.message);
+    }
+    
+    const boardUrl = `https://sprints.zoho.in/workspace/sanmedia#P${projectIdx}/board/SP${sprintIdx}`;
     res.json({ success: true, url: boardUrl });
   } catch (err) {
     console.error('Error building board URL', err);

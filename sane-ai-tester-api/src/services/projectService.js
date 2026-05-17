@@ -47,7 +47,9 @@ class ProjectService {
 
     async getSprintItems(projectId, sprintId, laneId = null) {
         const scraper = require('../services/zohoSprintScraper');
-        return await scraper.fetchSprintItems(projectId, sprintId, laneId);
+        const project = await projectRepository.findById(projectId);
+        const boardNumber = project ? project.boardId : null;
+        return await scraper.fetchSprintItems(projectId, sprintId, laneId, boardNumber);
     }
 
     // Sync Zoho projects using the scraper
