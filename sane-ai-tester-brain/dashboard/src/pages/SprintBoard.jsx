@@ -5,6 +5,7 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import StatusBadge from '../components/Common/StatusBadge'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
 import toast from 'react-hot-toast'
+import { customTaskApi } from '../services/api'
 
 const statusColumns = ['TODO', 'Test Case Ready', 'Testing Going', 'Report Generation', 'Task Completed']
 
@@ -16,6 +17,14 @@ function SprintBoard() {
   const [showTaskModal, setShowTaskModal] = useState(false)
   const [selectedWorker, setSelectedWorker] = useState('')
   const [taskUrl, setTaskUrl] = useState('')
+
+  // Custom Local Tasks States
+  const [customTasks, setCustomTasks] = useState([])
+  const [allProjectsList, setAllProjectsList] = useState([])
+  const [newTaskProject, setNewTaskProject] = useState('')
+  const [newTaskName, setNewTaskName] = useState('')
+  const [newTaskDescription, setNewTaskDescription] = useState('')
+  const [newTaskPriority, setNewTaskPriority] = useState('medium')
 
   // Zoho Sprints Integration States
   const [zohoProjects, setZohoProjects] = useState([])
@@ -66,9 +75,31 @@ function SprintBoard() {
     }
   }
 
+  const fetchCustomTasks = async () => {
+    try {
+      const data = await customTaskApi.getAll()
+      setCustomTasks(data || [])
+    } catch (e) {
+      console.error('Failed to load custom tasks:', e)
+    }
+  }
+
+  const fetchAllProjects = async () => {
+    try {
+      const res = await fetch('/api/projects')
+      const data = await res.json()
+      const list = Array.isArray(data) ? data : (data.projects || [])
+      setAllProjectsList(list)
+    } catch (e) {
+      console.error('Failed to load projects list:', e)
+    }
+  }
+
   // Initial loads
   useEffect(() => {
     loadZohoProjectsList()
+    fetchCustomTasks()
+    fetchAllProjects()
   }, [])
 
   // Sync projects manually using browser scraper
@@ -209,35 +240,76 @@ function SprintBoard() {
     e.preventDefault()
   }
 
-  const handleDrop = (newStatus) => {
+  const handleDrop = async (newStatus) => {
     if (draggedTask) {
-      setTasks(tasks.map(t => 
-        t.id === draggedTask.id ? { ...t, status: newStatus } : t
-      ))
+      if (draggedTask.isCustom) {
+        const statusDbValue = newStatus === 'TODO' ? 'todo' : newStatus;
+        try {
+          await customTaskApi.updateStatus(draggedTask.id, statusDbValue);
+          toast.success(`Task status updated to ${newStatus}`);
+          fetchCustomTasks();
+        } catch (e) {
+          toast.error('Failed to update task status');
+        }
+      } else {
+        setTasks(tasks.map(t => 
+          t.id === draggedTask.id ? { ...t, status: newStatus } : t
+        ))
+        toast.success(`Task moved to ${newStatus}`)
+      }
       setDraggedTask(null)
-      toast.success(`Task moved to ${newStatus}`)
     }
   }
 
-  const handleSendTask = async () => {
-    if (!selectedWorker) {
-      toast.error('Please select a worker')
+  const handleCreateLocalTask = async (e) => {
+    e.preventDefault()
+    if (!newTaskProject) {
+      toast.error('Please select a project')
       return
     }
-    if (!taskUrl) {
-      toast.error('Please enter a URL')
+    if (!newTaskName) {
+      toast.error('Task name/title is required')
       return
     }
 
-    const success = sendTask(selectedWorker, taskUrl, `Test ${taskUrl}`)
-    if (success) {
-      toast.success('Task sent successfully')
+    const tid = toast.loading('Creating local task...')
+    try {
+      await customTaskApi.create({
+        project_jobj_id: newTaskProject,
+        title: newTaskName,
+        description: newTaskDescription,
+        priority: newTaskPriority,
+        status: 'todo'
+      })
+      toast.success('Local task created successfully!', { id: tid })
       setShowTaskModal(false)
-      setTaskUrl('')
-      setSelectedWorker('')
-      fetchWorkers()
+      // Reset form fields
+      setNewTaskProject('')
+      setNewTaskName('')
+      setNewTaskDescription('')
+      setNewTaskPriority('medium')
+      
+      // Refresh list
+      fetchCustomTasks()
+    } catch (e) {
+      console.error(e)
+      toast.error('Failed to create local task', { id: tid })
     }
   }
+
+  const allBoardTasks = [
+    ...tasks,
+    ...customTasks.map(ct => ({
+      id: ct.custom_task_id,
+      name: ct.title,
+      prompt: ct.description,
+      status: ct.status === 'todo' ? 'TODO' : ct.status,
+      priority: ct.priority,
+      workerName: ct.project_name || 'Local Task',
+      workerId: 'Local Task',
+      isCustom: true
+    }))
+  ]
 
   if (loading) {
     return <LoadingSpinner />
@@ -255,7 +327,6 @@ function SprintBoard() {
           <button
             onClick={() => setShowTaskModal(true)}
             className="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-semibold rounded-xl transition-all shadow-md hover:shadow-lg duration-200"
-            disabled={!isConnected}
           >
             <Plus className="w-4.5 h-4.5" />
             New Local Task
@@ -401,13 +472,13 @@ function SprintBoard() {
             <div className="p-4 border-b border-slate-200/80 bg-white/50 rounded-t-2xl flex items-center justify-between">
               <h3 className="font-bold text-slate-800 text-sm tracking-wide">{status}</h3>
               <span className="text-xs font-bold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2.5 py-0.5 rounded-full">
-                {tasks.filter(t => t.status === status).length}
+                {allBoardTasks.filter(t => t.status === status).length}
               </span>
             </div>
 
             {/* Column Body */}
             <div className="p-3 space-y-3 flex-1 min-h-[480px]">
-              {tasks
+              {allBoardTasks
                 .filter(task => task.status === status)
                 .map((task) => (
                   <div
@@ -427,7 +498,7 @@ function SprintBoard() {
                     </h4>
                     
                     <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-400">Worker:</span>
+                      <span className="text-slate-400">{task.isCustom ? 'Project:' : 'Worker:'}</span>
                       <span className="font-semibold text-slate-700">{task.workerName || task.workerId}</span>
                     </div>
 
@@ -443,7 +514,7 @@ function SprintBoard() {
                   </div>
                 ))}
 
-              {tasks.filter(t => t.status === status).length === 0 && (
+              {allBoardTasks.filter(t => t.status === status).length === 0 && (
                 <div className="flex flex-col items-center justify-center py-16 text-slate-400">
                   <span className="text-xs">No active tasks</span>
                 </div>
@@ -457,52 +528,79 @@ function SprintBoard() {
       {showTaskModal && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center z-50 animate-fade-in">
           <div className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl border border-slate-100 animate-scale-up">
-            <h2 className="text-xl font-black text-slate-900 mb-2">Create New local Task</h2>
-            <p className="text-xs text-slate-500 mb-6">Assign a testing job to one of your currently online local workers</p>
+            <h2 className="text-xl font-black text-slate-900 mb-2">Create New Local Task</h2>
+            <p className="text-xs text-slate-500 mb-6">Create a manual task to track local workflow on the board</p>
             
-            <div className="space-y-4">
+            <form onSubmit={handleCreateLocalTask} className="space-y-4">
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Worker</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Select Project <span className="text-red-500">*</span></label>
                 <select
-                  value={selectedWorker}
-                  onChange={(e) => setSelectedWorker(e.target.value)}
+                  required
+                  value={newTaskProject}
+                  onChange={(e) => setNewTaskProject(e.target.value)}
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
                 >
-                  <option value="">Select a worker...</option>
-                  {workers.filter(w => w.status === 'online').map((worker) => (
-                    <option key={worker.worker_id} value={worker.worker_id}>
-                      {worker.nickname} ({worker.worker_id})
+                  <option value="" disabled>-- Select Project --</option>
+                  {allProjectsList.map((proj) => (
+                    <option key={proj.project_jobj_id} value={proj.project_jobj_id}>
+                      {proj.project_name} (ID: {proj.project_jobj_id})
                     </option>
                   ))}
                 </select>
               </div>
               
               <div>
-                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">URL to Test</label>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Task Name <span className="text-red-500">*</span></label>
                 <input
-                  type="url"
-                  value={taskUrl}
-                  onChange={(e) => setTaskUrl(e.target.value)}
-                  placeholder="https://example.com"
+                  required
+                  type="text"
+                  value={newTaskName}
+                  onChange={(e) => setNewTaskName(e.target.value)}
+                  placeholder="Enter task name..."
                   className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
                 />
               </div>
-            </div>
-            
-            <div className="flex gap-3 mt-8">
-              <button
-                onClick={() => setShowTaskModal(false)}
-                className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl transition-all text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSendTask}
-                className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-sm"
-              >
-                Send Task
-              </button>
-            </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Task Description</label>
+                <textarea
+                  value={newTaskDescription}
+                  onChange={(e) => setNewTaskDescription(e.target.value)}
+                  placeholder="Enter task details..."
+                  rows={3}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-slate-500 uppercase tracking-wider mb-1.5">Priority</label>
+                <select
+                  value={newTaskPriority}
+                  onChange={(e) => setNewTaskPriority(e.target.value)}
+                  className="w-full px-4 py-2.5 border border-slate-200 rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none text-sm font-medium"
+                >
+                  <option value="low">Low</option>
+                  <option value="medium">Medium</option>
+                  <option value="high">High</option>
+                </select>
+              </div>
+
+              <div className="flex gap-3 mt-8 pt-4 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setShowTaskModal(false)}
+                  className="flex-1 px-4 py-2.5 border border-slate-200 text-slate-600 hover:bg-slate-50 font-bold rounded-xl transition-all text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-md hover:shadow-lg text-sm"
+                >
+                  Create Task
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

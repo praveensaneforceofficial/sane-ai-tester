@@ -57,6 +57,14 @@ export const taskApi = {
   retry: (taskId) => api.post(`/tasks/retry/${taskId}`),
 }
 
+// Custom Task endpoints
+export const customTaskApi = {
+  getAll: () => api.get('/custom-tasks'),
+  create: (data) => api.post('/custom-tasks', data),
+  updateStatus: (customTaskId, status) => api.put(`/custom-tasks/${customTaskId}/status`, { status }),
+  delete: (customTaskId) => api.delete(`/custom-tasks/${customTaskId}`),
+}
+
 // Project endpoints
 export const projectApi = {
   getAll: () => api.get('/projects'),

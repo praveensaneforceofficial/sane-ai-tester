@@ -237,6 +237,7 @@ CREATE TABLE zoho_projects (
     id SERIAL PRIMARY KEY,
     project_jobj_id VARCHAR(100) UNIQUE NOT NULL,    -- 29601000000015012
     project_name VARCHAR(500) NOT NULL,               -- Pharma DotNetWeb
+    board_id int,
     category VARCHAR(50) DEFAULT 'zohosprint',       -- custom, zohosprint
     test_type VARCHAR(50),                            -- web, mobile, both
     mobile_platform VARCHAR(50),                      -- ios, android, both (if mobile)
