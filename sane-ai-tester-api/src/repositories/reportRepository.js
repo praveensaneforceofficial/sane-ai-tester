@@ -25,7 +25,13 @@ class ReportRepository {
     }
 
     async findByTask(taskId) {
-        const result = await db.query('SELECT * FROM test_reports WHERE task_id = $1', [taskId]);
+        let result;
+        if (taskId.startsWith('CT-')) {
+            const timestamp = taskId.replace('CT-', '');
+            result = await db.query('SELECT * FROM test_reports WHERE task_id LIKE $1 ORDER BY generated_at DESC', [`%${timestamp}%`]);
+        } else {
+            result = await db.query('SELECT * FROM test_reports WHERE task_id = $1', [taskId]);
+        }
         return result.rows[0] ? new ReportModel(result.rows[0]) : null;
     }
 

@@ -92,6 +92,7 @@ export const reportApi = {
   getTestSummary: (params) => api.get('/reports/test-summary', { params }),
   getFailedTests: (limit = 50) => api.get('/reports/failed-tests', { params: { limit } }),
   exportReport: (data) => api.post('/reports/export', data),
+  getByTaskId: (taskId) => api.get(`/reports/task/${taskId}`),
 }
 
 // Health endpoint

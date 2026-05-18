@@ -5,7 +5,7 @@ import { useWebSocket } from '../hooks/useWebSocket'
 import StatusBadge from '../components/Common/StatusBadge'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
 import toast from 'react-hot-toast'
-import { customTaskApi, taskApi } from '../services/api'
+import { customTaskApi, taskApi, reportApi } from '../services/api'
 
 const statusColumns = ['TODO', 'Test Case Ready', 'Testing Going', 'Report Generation', 'Task Completed']
 
@@ -197,10 +197,12 @@ function SprintBoard() {
     
     setLoadingActions(true)
     try {
+      let finalActions = [];
+      
       if (task.isCustom) {
         // Fetch actions from our dedicated custom_task_actions DB table
         const actions = await customTaskApi.getActions(task.id)
-        const mappedActions = (Array.isArray(actions) ? actions : []).map(act => ({
+        finalActions = (Array.isArray(actions) ? actions : []).map(act => ({
           id: act.id,
           step_number: null,
           action_type: act.action_type,
@@ -210,15 +212,44 @@ function SprintBoard() {
           error_message: null,
           executed_at: act.created_at
         }))
-        console.log(mappedActions);
-        setTaskActionsHistory(mappedActions)
+        console.log(finalActions);
       } else {
         const nodeTaskId = task.id
         if (nodeTaskId) {
           const actions = await taskApi.getActions(nodeTaskId)
-          setTaskActionsHistory(Array.isArray(actions) ? actions : [])
+          finalActions = Array.isArray(actions) ? [...actions] : []
         }
       }
+      
+      // Fetch report for both task types
+      if (task.id) {
+        try {
+          const reportData = await reportApi.getByTaskId(task.id)
+          if (reportData && reportData.summary) {
+            let videoUrl = null;
+            if (reportData.report_data && typeof reportData.report_data === 'object' && reportData.report_data.videoUrl) {
+              videoUrl = reportData.report_data.videoUrl;
+            } else if (reportData.video_path) {
+              videoUrl = reportData.video_path;
+            }
+            
+            let detailsText = `📝 AI Summary Generated:\n${reportData.summary}`;
+            
+            finalActions.push({
+              action_id: `report-${reportData.report_id}`,
+              action_type: 'REPORT GENERATED',
+              status: 'success',
+              details: detailsText,
+              video_url: videoUrl,
+              executed_at: reportData.created_at
+            })
+          }
+        } catch (e) {
+          console.log('No report found for this task yet')
+        }
+      }
+      
+      setTaskActionsHistory(finalActions)
     } catch (err) {
       console.error('Failed to fetch task actions history:', err)
     } finally {
@@ -974,6 +1005,7 @@ function SprintBoard() {
             const details = action.details || action.value || action.error_message || '';
             const created = action.created_at || action.executed_at || null;
             const screenshot = action.screenshot_url || action.screenshot_path || null;
+            const videoUrl = action.video_url || null;
 
             return {
               action_id: actionId,
@@ -981,6 +1013,7 @@ function SprintBoard() {
               status: status,
               details: details,
               screenshot_url: screenshot,
+              video_url: videoUrl,
               created_at: created
             };
           })
@@ -1131,6 +1164,14 @@ function SprintBoard() {
                             {action.screenshot_url && (
                               <div className="mt-3 overflow-hidden rounded-lg border border-slate-100 shadow-sm max-w-[200px]">
                                 <img src={action.screenshot_url} alt="Action step screenshot" className="w-full h-auto object-cover max-h-[120px]" />
+                              </div>
+                            )}
+                            {action.video_url && (
+                              <div className="mt-3">
+                                <a href={action.video_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-bold rounded-lg border border-indigo-200 transition-colors shadow-sm">
+                                  <Play className="w-3.5 h-3.5" />
+                                  Watch Execution Video
+                                </a>
                               </div>
                             )}
                           </div>

@@ -44,3 +44,16 @@ async def export_report(report_data: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as e:
         logger.error(f"Failed to export report: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/reports/task/{task_id}")
+async def get_report_by_task(task_id: str) -> Dict[str, Any]:
+    """Get report by task ID from Node.js API"""
+    try:
+        from services.apiBridgeService import api_bridge_service
+        report = await api_bridge_service.get_report_by_task(task_id)
+        if not report:
+            raise HTTPException(status_code=404, detail="Report not found for this task")
+        return report
+    except Exception as e:
+        logger.error(f"Failed to get report for task {task_id}: {e}")
+        raise HTTPException(status_code=404, detail=str(e))
