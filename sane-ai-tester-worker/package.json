@@ -40,5 +40,24 @@
     "electron": "^42.1.0",
     "electron-builder": "^26.8.1",
     "mocha": "^10.2.0"
+  },
+  "build": {
+    "appId": "com.saneai.testerworker",
+    "productName": "Sane AI Tester Worker",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true
+    },
+    "files": [
+      "src/**/*",
+      "package.json",
+      "scripts/**/*"
+    ]
   }
 }

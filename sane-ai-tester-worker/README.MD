@@ -21,6 +21,10 @@ Or with Electron GUI:
 
 bash
 npm run electron
+
+
+npm run pack
+
 ```
 
 # Project Structure for sane-ai-tester-worker
