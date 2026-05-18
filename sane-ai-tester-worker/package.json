@@ -8,7 +8,9 @@
     "electron": "electron src/main.js",
     "postinstall": "node scripts/postinstall.js",
     "setup": "node scripts/playwright-setup.js",
-    "test": "mocha tests/**/*.test.js"
+    "test": "mocha tests/**/*.test.js",
+    "dist": "electron-builder --win",
+    "pack": "electron-builder --dir"
   },
   "keywords": [
     "automation",

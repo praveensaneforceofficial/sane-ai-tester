@@ -38,4 +38,19 @@ class WorkerController:
             logger.error(f"Failed to get online workers: {e}")
             return []
 
+    async def update_worker_status(self, worker_id: str, action: str) -> Dict[str, Any]:
+        try:
+            return await api_bridge_service.update_worker_status(worker_id, action)
+        except Exception as e:
+            logger.error(f"Failed to update worker status {worker_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
+    async def delete_worker(self, worker_id: str) -> Dict[str, Any]:
+        try:
+            await api_bridge_service.delete_worker(worker_id)
+            return {"success": True, "message": "Worker deleted successfully"}
+        except Exception as e:
+            logger.error(f"Failed to delete worker {worker_id}: {e}")
+            raise HTTPException(status_code=500, detail=str(e))
+
 worker_controller = WorkerController()

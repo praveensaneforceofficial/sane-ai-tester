@@ -28,3 +28,16 @@ async def get_worker_tasks(
 ) -> List[Dict[str, Any]]:
     """Get tasks for specific worker"""
     return await worker_controller.get_worker_tasks(worker_id, limit)
+
+@router.put("/workers/{worker_id}/status")
+async def update_worker_status(worker_id: str, status_data: Dict[str, Any]) -> Dict[str, Any]:
+    """Update worker status/action"""
+    action = status_data.get("action")
+    if not action:
+        raise HTTPException(status_code=400, detail="Action is required")
+    return await worker_controller.update_worker_status(worker_id, action)
+
+@router.delete("/workers/{worker_id}")
+async def delete_worker(worker_id: str) -> Dict[str, Any]:
+    """Delete/Remove worker"""
+    return await worker_controller.delete_worker(worker_id)

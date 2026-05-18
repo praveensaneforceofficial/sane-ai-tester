@@ -2,10 +2,11 @@ import React, { useState } from 'react'
 import { useWorkerStore } from '../store/workerStore'
 import StatusBadge from '../components/Common/StatusBadge'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
-import { Cpu, Server, Wifi, WifiOff, Activity, Clock, Plus, Smartphone, GitFork, LayoutGrid } from 'lucide-react'
+import { Cpu, Server, Wifi, WifiOff, Activity, Clock, Plus, Smartphone, GitFork, LayoutGrid, Trash2, PowerOff } from 'lucide-react'
+import toast from 'react-hot-toast'
 
 function Agents() {
-  const { workers, loading } = useWorkerStore()
+  const { workers, loading, updateWorkerStatus, deleteWorker } = useWorkerStore()
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [viewType, setViewType] = useState('tree') // 'tree' or 'board'
 
@@ -337,11 +338,53 @@ function Agents() {
               </div>
             </div>
             
+            {/* Action Buttons */}
+            <div className="grid grid-cols-2 gap-3 mt-6">
+              <button
+                disabled={selectedAgent.status === 'offline'}
+                onClick={async () => {
+                  const success = await updateWorkerStatus(selectedAgent.worker_id, 'offline')
+                  if (success) {
+                    toast.success('Agent marked offline')
+                    setSelectedAgent(null)
+                  } else {
+                    toast.error('Failed to change status')
+                  }
+                }}
+                className={`flex items-center justify-center gap-2 px-4 py-2 border rounded-lg text-sm font-semibold transition-all duration-200 ${
+                  selectedAgent.status === 'offline'
+                    ? 'bg-gray-50 border-gray-200 text-gray-400 cursor-not-allowed'
+                    : 'bg-white border-rose-200 text-rose-600 hover:bg-rose-50'
+                }`}
+              >
+                <PowerOff className="w-4 h-4" />
+                Force Offline
+              </button>
+
+              <button
+                onClick={async () => {
+                  if (window.confirm(`Are you sure you want to permanently delete agent ${selectedAgent.nickname}?`)) {
+                    const success = await deleteWorker(selectedAgent.worker_id)
+                    if (success) {
+                      toast.success('Agent removed from registry')
+                      setSelectedAgent(null)
+                    } else {
+                      toast.error('Failed to delete agent')
+                    }
+                  }
+                }}
+                className="flex items-center justify-center gap-2 px-4 py-2 bg-rose-600 text-white rounded-lg text-sm font-semibold hover:bg-rose-700 transition-all duration-200 shadow-md shadow-rose-600/10"
+              >
+                <Trash2 className="w-4 h-4" />
+                Remove Agent
+              </button>
+            </div>
+
             <button
               onClick={() => setSelectedAgent(null)}
-              className="w-full mt-6 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
+              className="w-full mt-3 px-4 py-2 border border-slate-200 text-slate-600 rounded-lg text-sm font-semibold hover:bg-slate-50 transition-colors"
             >
-              Close
+              Cancel
             </button>
           </div>
         </div>
