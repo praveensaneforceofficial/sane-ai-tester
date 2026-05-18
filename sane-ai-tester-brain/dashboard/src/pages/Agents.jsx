@@ -116,7 +116,7 @@ function Agents() {
         ) : (
           <div className="flex flex-col items-center w-full py-10 bg-white border border-slate-200/60 rounded-3xl shadow-sm relative overflow-hidden">
             {/* Master Node */}
-            <div className="flex flex-col items-center relative z-10 mb-16">
+            <div className="flex flex-col items-center relative z-10 mb-2">
               <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center shadow-xl shadow-indigo-500/20 ring-4 ring-indigo-50/50 mb-3 relative animate-pulse-slow">
                 <Server className="w-7 h-7 text-white" />
               </div>
@@ -132,8 +132,8 @@ function Agents() {
             </div>
 
             {/* Connecting SVG Curves */}
-            <div className="absolute inset-x-0 top-[130px] h-[85px] pointer-events-none z-0">
-              <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+            <div className="w-full h-[60px] px-6 relative pointer-events-none z-0">
+              <svg className="w-full h-full overflow-visible" viewBox="0 0 100 100" preserveAspectRatio="none">
                 {workers.map((w, idx) => {
                   const startX = 50;
                   const startY = 0;

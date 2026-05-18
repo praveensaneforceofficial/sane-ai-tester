@@ -65,19 +65,17 @@ class WorkerService {
         switch (action) {
             case 'active':
                 await workerRepository.updateLastSeen(workerId);
-                break;
+                const activeWorker = await workerRepository.updateStatus(workerId, 'online');
+                return activeWorker ? activeWorker.toJSON() : null;
             case 'offline':
-                await workerRepository.updateStatus(workerId, 'offline');
-                break;
+                const offlineWorker = await workerRepository.updateStatus(workerId, 'offline');
+                return offlineWorker ? offlineWorker.toJSON() : null;
             case 'remove':
                 await workerRepository.delete(workerId);
                 return { removed: true };
             default:
                 throw new Error('Invalid action');
         }
-
-        const updatedWorker = await workerRepository.updateStatus(workerId, 'online');
-        return updatedWorker ? updatedWorker.toJSON() : null;
     }
 
     async updateActivity(workerId) {

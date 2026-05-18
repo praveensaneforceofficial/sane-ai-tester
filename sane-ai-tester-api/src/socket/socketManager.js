@@ -22,6 +22,7 @@ class SocketManager {
             try {
                 const result = await workerService.registerWorker({ machineId, nickname, ip, os });
                 socket.join(result.workerId);
+                socket.workerId = result.workerId;
                 socket.emit('worker:registered', result);
                 this.emitDashboardUpdate();
                 this.io.emit('worker:online', { workerId: result.workerId, nickname: result.nickname });
@@ -131,8 +132,18 @@ class SocketManager {
         });
 
         // 7. Disconnect
-        socket.on('disconnect', () => {
+        socket.on('disconnect', async () => {
             console.log('🔴 User disconnected:', socket.id);
+            if (socket.workerId) {
+                console.log(`🔌 Worker disconnected: ${socket.workerId}. Marking offline...`);
+                try {
+                    await workerService.updateWorkerStatus(socket.workerId, 'offline');
+                    this.emitDashboardUpdate();
+                    this.io.emit('worker:offline', { workerId: socket.workerId });
+                } catch (err) {
+                    console.error(`❌ Failed to set worker ${socket.workerId} offline:`, err);
+                }
+            }
         });
     }
 

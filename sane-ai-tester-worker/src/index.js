@@ -20,8 +20,23 @@ async function fetchAndExecutePendingTasks(workerId) {
     try {
         const response = await axios.get(`${config.API_URL}/api/tasks/worker/${workerId}`);
         const tasks = response.data;
-        const pendingTasks = tasks.filter(t => t.status === 'pending');
-        logger.info(`📋 Found ${pendingTasks.length} pending task(s)`);
+
+        // Only pick up FRESH pending tasks (created within last 2 hours)
+        // This prevents old stale tasks from being re-executed on every restart
+        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+        const now = Date.now();
+        const pendingTasks = tasks.filter(t => {
+            if (t.status !== 'pending') return false;
+            const createdAt = t.created_at ? new Date(t.created_at).getTime() : 0;
+            const ageMs = now - createdAt;
+            if (ageMs > TWO_HOURS_MS) {
+                logger.warn(`⏳ Skipping stale task ${t.task_id} (created ${Math.round(ageMs / 60000)} min ago)`);
+                return false;
+            }
+            return true;
+        });
+
+        logger.info(`📋 Found ${pendingTasks.length} fresh pending task(s) (skipped ${tasks.filter(t => t.status === 'pending').length - pendingTasks.length} stale)`);
         
         if (pendingTasks.length > 0 && agent) {
             // Pick the first pending task
