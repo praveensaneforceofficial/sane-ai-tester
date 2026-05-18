@@ -1,5 +1,6 @@
 const workerService = require('../services/workerService');
 const taskService = require('../services/taskService');
+const reportService = require('../services/reportService');
 
 class SocketManager {
     constructor(io) {
@@ -61,6 +62,34 @@ class SocketManager {
             const { taskId, workerId, resultData } = data;
             try {
                 await taskService.updateStatus(taskId, 'completed');
+                
+                // Calculate success rate and test counts
+                const total = resultData.actions ? resultData.actions.length : 0;
+                const passed = resultData.actions ? resultData.actions.filter(a => a.success).length : 0;
+                const failed = total - passed;
+                const successRate = total > 0 ? (passed / total) * 100 : 0;
+                
+                // Get task info for project name
+                const task = await taskService.getById(taskId).catch(() => null);
+                const projectName = task ? (task.project_name || 'Saneforce Project') : 'Saneforce Project';
+
+                // Automatically generate and save test report to DB
+                await reportService.generate({
+                    task_id: taskId,
+                    worker_id: workerId,
+                    project_name: projectName,
+                    total_tests: total,
+                    passed_tests: passed,
+                    failed_tests: failed,
+                    skipped_tests: 0,
+                    success_rate: successRate,
+                    duration: 0,
+                    summary: resultData.summary || 'AI Auto-Test execution completed.',
+                    report_data: JSON.stringify(resultData),
+                    video_path: resultData.videoPath || null,
+                    screenshots: JSON.stringify(resultData.screenshots || [])
+                });
+
                 this.emitDashboardUpdate();
                 
                 // Dashboard Hook expects task-completed-alert
@@ -79,6 +108,17 @@ class SocketManager {
                 this.emitDashboardUpdate();
             } catch (err) {
                 console.error('❌ Task error handling error:', err);
+            }
+        });
+
+        // 5.5 Task Start
+        socket.on('worker:task:start', async (data) => {
+            const { taskId, workerId } = data;
+            try {
+                await taskService.updateStatus(taskId, 'in_progress');
+                this.emitDashboardUpdate();
+            } catch (err) {
+                console.error('❌ Task start error:', err);
             }
         });
 

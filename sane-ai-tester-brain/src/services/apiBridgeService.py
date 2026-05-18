@@ -150,8 +150,8 @@ class APIBridgeService:
     async def generate_report(self, report_data: Dict) -> Dict:
         return await api_rest_client.post("/api/reports", report_data)
     
-    async def get_report_by_task(self, task_id: str) -> Dict:
-        return await api_rest_client.get(f"/api/reports/task/{task_id}")
+    async def get_report_by_task(self, task_id: str) -> Optional[Dict]:
+        return await api_rest_client.get(f"/api/reports/task/{task_id}", silence_404=True)
     
     async def get_reports_by_worker(self, worker_id: str) -> List[Dict]:
         return await api_rest_client.get(f"/api/reports/worker/{worker_id}")

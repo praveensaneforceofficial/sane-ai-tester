@@ -59,6 +59,13 @@ class Agent {
         
         try {
             logger.info(`🎯 Executing task ID: ${task.taskId || task.id}`);
+            
+            // Emit task start back to central server
+            this.socket.emit('worker:task:start', {
+                taskId: task.taskId || task.id,
+                workerId: this.workerId
+            });
+            
             const instructions = task.prompt || task.test_instructions || 'Navigate and check page';
             
             // 0. Extract DOM Selector Context to assist the AI

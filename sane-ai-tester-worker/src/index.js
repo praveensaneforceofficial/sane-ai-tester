@@ -1,6 +1,7 @@
 const { machineIdSync } = require('node-machine-id');
 const prompts = require('prompts');
 const dotenv = require('dotenv');
+const axios = require('axios');
 
 // Load environment configurations
 dotenv.config();
@@ -13,6 +14,36 @@ const config = require('./utils/config');
 
 let agent = null;
 let currentStatus = 'active'; // Default to active for autonomous execution
+
+async function fetchAndExecutePendingTasks(workerId) {
+    logger.info(`🔍 Checking for pending tasks assigned to worker ${workerId}...`);
+    try {
+        const response = await axios.get(`${config.API_URL}/api/tasks/worker/${workerId}`);
+        const tasks = response.data;
+        const pendingTasks = tasks.filter(t => t.status === 'pending');
+        logger.info(`📋 Found ${pendingTasks.length} pending task(s)`);
+        
+        if (pendingTasks.length > 0 && agent) {
+            // Pick the first pending task
+            const task = pendingTasks[0];
+            logger.info(`🎯 Automatically starting pending task: ${task.task_id || task.id}`);
+            
+            // Format task payload
+            const taskPayload = {
+                taskId: task.task_id || task.id,
+                url: task.url,
+                prompt: task.prompt || task.test_instructions
+            };
+            
+            // Execute task asynchronously so registration flow is not blocked
+            agent.executeTask(taskPayload).catch(err => {
+                logger.error(`❌ Failed to execute pending task: ${err.message}`);
+            });
+        }
+    } catch (err) {
+        logger.error(`❌ Failed to fetch pending tasks: ${err.message}`);
+    }
+}
 
 async function startWorker() {
     console.clear();
@@ -37,10 +68,17 @@ async function startWorker() {
         }
         
         // Automatically transition to active/online
-        setStatus('active');
+        await setStatus('active');
         
         // Start Heartbeat updates
         heartbeat.start(workerData.workerId, agent);
+
+        // Fetch and execute pending tasks automatically
+        try {
+            await fetchAndExecutePendingTasks(workerData.workerId);
+        } catch (err) {
+            logger.error(`Error checking pending tasks: ${err.message}`);
+        }
 
         // Enter Interactive Loop
         showInteractiveMenu();
@@ -68,14 +106,14 @@ async function startWorker() {
     socketClient.connect();
 }
 
-function setStatus(status) {
+async function setStatus(status) {
     currentStatus = status;
     if (status === 'active') {
         logger.info("\n🚀 STATUS CHANGED TO: ONLINE (Listening for Tasks)");
-        if (agent) agent.start(); // Initializes Playwright
+        if (agent) await agent.start(); // Initializes Playwright
     } else {
         logger.info("\n🛑 STATUS CHANGED TO: OFFLINE (Stopped listening)");
-        if (agent) agent.cleanup(); // Closes Playwright
+        if (agent) await agent.cleanup(); // Closes Playwright
     }
     
     if (socketClient.workerId) {

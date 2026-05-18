@@ -288,7 +288,30 @@ class AIOrchestratorService:
         
         for task in testing_tasks:
             # Check if task is already assigned to a runner
-            if task.get('task_id'):
+            node_task_id = task.get('task_id')
+            if node_task_id:
+                # Retrieve the actual runner task status for self-healing re-assignment
+                try:
+                    node_task = await api_bridge_service.get_task_by_id(node_task_id)
+                    if node_task and node_task.get('status') == 'pending':
+                        assigned_worker_id = node_task.get('worker_id')
+                        if assigned_worker_id:
+                            worker_online = False
+                            for w in workers:
+                                if w.get('worker_id') == assigned_worker_id and w.get('status') == 'online':
+                                    worker_online = True
+                                    break
+                            
+                            if worker_online:
+                                logger.info(f"Task '{task.get('title')}' runner task is pending. Re-emitting assignment to online worker.")
+                                await api_bridge_service.emit_task_assign(
+                                    worker_id=assigned_worker_id,
+                                    task_id=node_task_id,
+                                    url=node_task.get('url'),
+                                    prompt=node_task.get('prompt') or task.get('test_instructions')
+                                )
+                except Exception as ex:
+                    logger.error(f"Error checking pending runner task {node_task_id}: {ex}")
                 continue # Already assigned
                 
             title = task.get('title')
@@ -378,8 +401,8 @@ class AIOrchestratorService:
                     # Check if worker is online, if not mention waiting
                     worker_status = "offline"
                     # Find worker in registry
-                    node_task = await api_bridge_service.get_task_status(node_task_id)
-                    assigned_worker_id = node_task.get("workerId") if node_task else None
+                    node_task = await api_bridge_service.get_task_by_id(node_task_id)
+                    assigned_worker_id = node_task.get("worker_id") if node_task else None
                     if assigned_worker_id:
                         for w in workers:
                             if w.get("worker_id") == assigned_worker_id:
@@ -444,7 +467,7 @@ class AIOrchestratorService:
                 Test Report details:
                 - Success Rate: {success_rate}%
                 - Error Summary: {error_summary}
-                - Report Metadata: {json.dumps(report.get('metadata', {{}}))}
+                - Report Metadata: {json.dumps(report.get('metadata', {}))}
                 
                 Determine:
                 1. Did the test complete successfully with all expected outcomes correct (e.g. success rate is high and no major critical blocks), or were there failures/issues?
@@ -491,7 +514,8 @@ class AIOrchestratorService:
                     summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: {summary_text}")
                     
             except Exception as e:
-                logger.error(f"Error evaluating report for custom task {task_id}: {e}")
+                import traceback
+                logger.error(f"Error evaluating report for custom task {task_id}: {e}\n{traceback.format_exc()}")
 
         return summary_results
 

@@ -26,9 +26,9 @@ class TaskRepository {
     async updateStatus(taskId, status, error = null) {
         const result = await db.query(
             `UPDATE tasks 
-             SET status = $1, 
-                 error_message = $2, 
-                 completed_at = CASE WHEN $1 IN ('completed', 'failed') THEN NOW() ELSE completed_at END,
+             SET status = $1::varchar, 
+                 error_message = $2::text, 
+                 completed_at = CASE WHEN $1::varchar IN ('completed', 'failed') THEN NOW() ELSE completed_at END,
                  updated_at = NOW() 
              WHERE task_id = $3 
              RETURNING *`,

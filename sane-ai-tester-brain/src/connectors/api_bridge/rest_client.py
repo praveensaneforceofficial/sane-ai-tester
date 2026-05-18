@@ -12,17 +12,29 @@ class APIRestClient:
         self.base_url = settings.API_URL
         self.is_connected = False
     
-    async def get(self, endpoint: str, params: Optional[Dict] = None) -> Any:
+    async def get(self, endpoint: str, params: Optional[Dict] = None, silence_404: bool = False) -> Any:
         """GET request to API bridge"""
         try:
             url = f"{self.base_url}{endpoint}"
             async with httpx.AsyncClient(timeout=30.0) as client:
                 response = await client.get(url, params=params)
+                if silence_404 and response.status_code == 404:
+                    return None
                 response.raise_for_status()
                 self.is_connected = True
                 return response.json()
         except Exception as e:
             self.is_connected = False
+            # Check if it's a 404 client error
+            is_404 = False
+            if hasattr(e, 'response') and e.response is not None and e.response.status_code == 404:
+                is_404 = True
+            elif "404" in str(e):
+                is_404 = True
+                
+            if silence_404 and is_404:
+                return None
+                
             logger.error(f"GET {endpoint} failed: {e}")
             raise
     
