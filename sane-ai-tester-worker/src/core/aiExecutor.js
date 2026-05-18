@@ -4,7 +4,7 @@ const config = require('../utils/config');
 
 class AIExecutor {
     constructor() {
-        this.aiMode = config.AI_MODE || 'local';
+        this.aiMode = config.AI_MODE || 'openai';
         this.ollamaUrl = config.OLLAMA_URL;
         this.ollamaModel = config.OLLAMA_MODEL;
         this.openaiKey = config.OPENAI_API_KEY;
@@ -12,42 +12,40 @@ class AIExecutor {
     }
     
     /**
-     * Legacy parse prompt for static execution (keep for fallback)
-     */
-    async parsePrompt(prompt, url) {
-        // Fallback functionality
-        return this.getFallbackActions(prompt, url);
-    }
-
-    /**
-     * Generates a raw Puppeteer JavaScript script based on the task prompt/instructions.
+     * Generates a raw Playwright JavaScript script based on the task prompt/instructions.
      * @param {string} prompt Test instructions from the brain
      * @param {string} url Target URL
+     * @param {string} domContext Live DOM structure of the page to guide selector identification
      * @returns {Promise<string>} Raw JavaScript code to execute
      */
-    async generatePuppeteerScript(prompt, url, domContext = "") {
-        logger.info("🧠 Generating dynamic Puppeteer script via AI...");
+    async generatePlaywrightScript(prompt, url, domContext = "") {
+        logger.info("🧠 Generating dynamic Playwright script via AI...");
         
-        const systemPrompt = `You are a Senior QA Automation Engineer writing a Puppeteer automation script.
+        const systemPrompt = `You are a Senior QA Automation Engineer writing a Playwright automation script in JavaScript.
 Your task is to convert the user's instructions into raw JavaScript code.
 The code you generate will be executed dynamically inside an AsyncFunction.
 
 AVAILABLE CONTEXT:
-- 'page' : The active Puppeteer Page object. It is already initialized and navigated to the target URL.
+- 'page' : The active Playwright Page object. It is already initialized and navigated to the target URL.
 - 'logger' : A logging object with logger.info(), logger.warn(), logger.error().
 
 RULES:
 1. ONLY return the raw JavaScript code to execute the steps. NO markdown formatting, NO \`\`\`javascript blocks, NO explanations.
-2. DO NOT include "const puppeteer = require('puppeteer')" or browser initialization.
-3. Use await page.waitForSelector(), await page.click(), await page.type(), etc.
+2. DO NOT include "const { chromium } = require('playwright')" or browser/context/page initialization.
+3. Use Playwright standard commands: 
+   - await page.waitForSelector('selector', { timeout: 10000 })
+   - await page.click('selector')
+   - await page.fill('selector', 'value')
+   - await page.selectOption('selector', 'value') (Note: selectOption selects option elements)
+   - await page.waitForTimeout(milliseconds)
 4. Add relevant logger.info() statements to document progress.
-5. If you need to search or assert text, use XPath or page.evaluate.
+5. If you need to click text, use page.locator('text=Your Text').click().
 6. The code must be self-contained and run synchronously.
 
 Example Output format:
 logger.info("Starting execution");
 await page.waitForSelector('input[name="username"]');
-await page.type('input[name="username"]', 'admin');
+await page.fill('input[name="username"]', 'admin');
 await page.click('button[type="submit"]');
 logger.info("Finished");
 `;
@@ -56,18 +54,16 @@ logger.info("Finished");
         if (domContext) {
             userPrompt += `DOM SELECTOR CONTEXT OF TARGET PAGE:\n${domContext}\n\n`;
         }
-        userPrompt += `Please generate the raw Puppeteer JavaScript code to execute this test scenario. Make sure to use the exact matching selectors from the DOM Selector Context above if provided!`;
+        userPrompt += `Please generate the raw Playwright JavaScript code to execute this test scenario. Make sure to use the exact matching selectors from the DOM Selector Context above if provided!`;
 
         try {
             let scriptCode = "";
             
-            // Respect AI_MODE configuration
             if (this.aiMode === 'openai' && this.openaiKey) {
                 scriptCode = await this.callOpenAI(systemPrompt, userPrompt);
             } else if (this.aiMode === 'local') {
                 scriptCode = await this.callOllama(systemPrompt + "\n" + userPrompt);
             } else {
-                // Fallback
                 if (this.openaiKey) {
                     scriptCode = await this.callOpenAI(systemPrompt, userPrompt);
                 } else {
@@ -81,7 +77,7 @@ logger.info("Finished");
                                    .replace(/^```\s*/, '')
                                    .replace(/```\s*$/, '');
             
-            logger.info("✅ Successfully generated dynamic script");
+            logger.info("✅ Successfully generated dynamic Playwright script");
             return scriptCode.trim();
             
         } catch (error) {
@@ -109,7 +105,6 @@ Format your response as a professional summary report (1-3 small paragraphs). No
             } else if (this.aiMode === 'local') {
                 return await this.callOllama(systemPrompt + "\n" + userPrompt);
             } else {
-                // Fallback
                 if (this.openaiKey) {
                     return await this.callOpenAI(systemPrompt, userPrompt);
                 } else {
@@ -125,12 +120,12 @@ Format your response as a professional summary report (1-3 small paragraphs). No
     async callOpenAI(systemPrompt, userPrompt) {
         try {
             const response = await axios.post('https://api.openai.com/v1/chat/completions', {
-                model: this.openaiModel,
+                model: this.openaiModel || 'gpt-4o',
                 messages: [
                     { role: 'system', content: systemPrompt },
                     { role: 'user', content: userPrompt }
                 ],
-                temperature: 0.2, // Low temperature for code reliability
+                temperature: 0.2,
                 max_tokens: 3000
             }, {
                 headers: {
@@ -150,7 +145,7 @@ Format your response as a professional summary report (1-3 small paragraphs). No
     async callOllama(prompt) {
         try {
             const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
-                model: this.ollamaModel,
+                model: this.ollamaModel || 'llama3',
                 prompt: prompt,
                 stream: false,
                 temperature: 0.2
@@ -164,17 +159,10 @@ Format your response as a professional summary report (1-3 small paragraphs). No
         }
     }
     
-    getFallbackActions(prompt, url) {
-        // Basic fallback actions
-        const actions = [];
-        actions.push({ type: 'wait', value: 2000 });
-        return actions;
-    }
-    
     async analyzeError(error, stackTrace) {
         const analysisPrompt = `Analyze this test automation error and provide: 1. Root cause 2. Suggested fix\n\nError: ${error}\nStack Trace: ${stackTrace || 'Not available'}`;
         try {
-            if (this.openaiKey) {
+            if (this.aiMode === 'openai' && this.openaiKey) {
                 return await this.callOpenAI("You are a QA automation debugger.", analysisPrompt);
             } else {
                 return await this.callOllama(analysisPrompt);

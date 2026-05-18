@@ -1,24 +1,18 @@
-const io = require('socket.io-client');
 const { machineIdSync } = require('node-machine-id');
 const prompts = require('prompts');
-const os = require('os');
 const dotenv = require('dotenv');
 
-// Load config
+// Load environment configurations
 dotenv.config();
 
+const socketClient = require('./network/socketClient');
+const heartbeat = require('./network/heartbeat');
 const Agent = require('./core/agent');
 const logger = require('./utils/logger');
 const config = require('./utils/config');
 
-const API_URL = config.API_URL;
-const socket = io(API_URL, { timeout: 5000, reconnection: true });
-const mId = machineIdSync();
-
-let currentWorkerData = null;
 let agent = null;
 let currentStatus = 'active'; // Default to active for autonomous execution
-let heartbeatInterval = null;
 
 async function startWorker() {
     console.clear();
@@ -27,47 +21,34 @@ async function startWorker() {
     console.log("     Interactive AI Test Executor       ");
     console.log("=========================================\n");
 
-    socket.on('connect', () => {
-        logger.info("✅ Server Connection: ESTABLISHED");
-        // Always try to register/identify on connection
-        registerWorker(config.WORKER_NAME || `System-${mId.substring(0, 4)}`);
+    // Configure connection events
+    socketClient.on('onConnect', () => {
+        logger.info("✅ Connected to Central Server");
     });
 
-    socket.on('worker:registered', async (workerData) => {
-        currentWorkerData = workerData;
+    socketClient.on('onRegistered', async (workerData) => {
         logger.info(`\n✅ Registered Successfully!`);
         logger.info(`🆔 Worker ID: ${workerData.workerId}`);
         logger.info(`👤 Nickname: ${workerData.nickname}`);
         
         // Setup Agent
         if (!agent) {
-            agent = new Agent(workerData.workerId, socket, { enableRecording: config.RECORD_VIDEO });
+            agent = new Agent(workerData.workerId, socketClient, { enableRecording: config.RECORD_VIDEO });
         }
         
         // Automatically transition to active/online
         setStatus('active');
         
-        // Start Heartbeat
-        if (heartbeatInterval) clearInterval(heartbeatInterval);
-        heartbeatInterval = setInterval(() => {
-            if (socket.connected && currentStatus === 'active') {
-                socket.emit('worker:heartbeat', { 
-                    workerId: currentWorkerData.workerId,
-                    cpu_usage: 0,
-                    memory_usage: 0,
-                    current_task_id: agent?.currentTask?.taskId || null
-                });
-            }
-        }, 30000);
+        // Start Heartbeat updates
+        heartbeat.start(workerData.workerId, agent);
 
         // Enter Interactive Loop
         showInteractiveMenu();
     });
 
-    // Listen to Task Assignment
-    socket.on('task:assign', async (task) => {
+    socketClient.on('onTaskAssign', async (task) => {
         if (currentStatus !== 'active') {
-            logger.warn(`📥 Received task ${task.taskId} but worker is OFFLINE. Ignoring.`);
+            logger.warn(`📥 Received task but worker is OFFLINE. Ignoring.`);
             return;
         }
         
@@ -83,46 +64,34 @@ async function startWorker() {
         }
     });
 
-    socket.on('connect_error', () => {
-        logger.error("❌ Server Offline or Unreachable. Retrying...");
-    });
-}
-
-function registerWorker(nickname) {
-    socket.emit('worker:register', {
-        machineId: mId,
-        nickname: nickname,
-        ip: config.getLocalIp(),
-        os: os.platform()
-    });
+    // Start Socket connection
+    socketClient.connect();
 }
 
 function setStatus(status) {
     currentStatus = status;
     if (status === 'active') {
         logger.info("\n🚀 STATUS CHANGED TO: ONLINE (Listening for Tasks)");
-        if (agent) agent.start(); // Initializes Puppeteer
+        if (agent) agent.start(); // Initializes Playwright
     } else {
         logger.info("\n🛑 STATUS CHANGED TO: OFFLINE (Stopped listening)");
-        if (agent) agent.cleanup(); // Closes Puppeteer
+        if (agent) agent.cleanup(); // Closes Playwright
     }
     
-    // Server expects action as 'active' or 'offline'
-    if (currentWorkerData) {
-        socket.emit('worker:status', { 
-            workerId: currentWorkerData.workerId, 
+    if (socketClient.workerId) {
+        socketClient.emit('worker:status', { 
+            workerId: socketClient.workerId, 
             action: status 
         });
     }
 }
 
 async function showInteractiveMenu() {
-    // Small delay to ensure logs flush before prompt
     await new Promise(r => setTimeout(r, 500));
     
     while (true) {
         console.log(`\n--- CURRENT STATE ---`);
-        console.log(`👤 Nickname: ${currentWorkerData ? currentWorkerData.nickname : 'Unknown'}`);
+        console.log(`👤 Nickname: ${socketClient.nickname || 'Unknown'}`);
         console.log(`🚥 Status:   ${currentStatus.toUpperCase()}`);
         console.log(`---------------------\n`);
         
@@ -137,7 +106,7 @@ async function showInteractiveMenu() {
             ]
         });
 
-        if (!response.action) break; // Ctrl+C handling
+        if (!response.action) break;
 
         if (response.action === 'nickname') {
             const nickResponse = await prompts({
@@ -148,9 +117,7 @@ async function showInteractiveMenu() {
             if (nickResponse.newNickname && nickResponse.newNickname.trim() !== '') {
                 logger.info(`Updating nickname to: ${nickResponse.newNickname}`);
                 config.WORKER_NAME = nickResponse.newNickname;
-                registerWorker(nickResponse.newNickname);
-                // The loop will pause here because registerWorker triggers 'worker:registered' 
-                // which calls showInteractiveMenu again. So we break this loop.
+                socketClient.register(nickResponse.newNickname);
                 break; 
             }
         } 
@@ -161,30 +128,30 @@ async function showInteractiveMenu() {
         else if (response.action === 'exit') {
             logger.info("Exiting application...");
             if (agent) await agent.cleanup();
-            if (socket) socket.disconnect();
+            heartbeat.stop();
+            socketClient.disconnect();
             process.exit(0);
         }
     }
 }
 
 // Graceful shutdown
-process.on('SIGINT', async () => {
+const shutdown = async () => {
     logger.info('\n🛑 Shutting down worker...');
-    if (currentWorkerData && socket) {
-        socket.emit('worker:status', { 
-            workerId: currentWorkerData.workerId, 
+    if (socketClient.workerId) {
+        socketClient.emit('worker:status', { 
+            workerId: socketClient.workerId, 
             action: 'offline' 
         });
         await new Promise(resolve => setTimeout(resolve, 500));
     }
     if (agent) await agent.cleanup();
-    if (socket) socket.disconnect();
+    heartbeat.stop();
+    socketClient.disconnect();
     process.exit(0);
-});
+};
 
-process.on('SIGTERM', async () => {
-    if (agent) await agent.cleanup();
-    process.exit(0);
-});
+process.on('SIGINT', shutdown);
+process.on('SIGTERM', shutdown);
 
 startWorker();

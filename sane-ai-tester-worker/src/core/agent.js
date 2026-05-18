@@ -1,4 +1,4 @@
-const PuppeteerRunner = require('./puppeteerRunner');
+const PlaywrightRunner = require('./playwrightRunner');
 const AIExecutor = require('./aiExecutor');
 const s3Service = require('../services/s3Service');
 const logger = require('../utils/logger');
@@ -12,7 +12,7 @@ class Agent {
         this.isRunning = false;
         this.currentTask = null;
         this.enableRecording = options.enableRecording || false;
-        this.puppeteerRunner = null;
+        this.playwrightRunner = null;
         this.aiExecutor = new AIExecutor();
         this.taskHistory = [];
         
@@ -27,7 +27,7 @@ class Agent {
         logger.info(`🚀 Agent ${this.workerId} started`);
         this.emitStatus('active');
         
-        this.puppeteerRunner = new PuppeteerRunner({
+        this.playwrightRunner = new PlaywrightRunner({
             headless: config.BROWSER_HEADLESS,
             slowMo: config.BROWSER_SLOW_MO,
             recordVideo: this.enableRecording,
@@ -35,8 +35,8 @@ class Agent {
             videoPath: config.VIDEO_PATH
         });
         
-        await this.puppeteerRunner.initialize();
-        logger.info("✅ Agent Automation Framework initialized");
+        await this.playwrightRunner.initialize();
+        logger.info("✅ Agent Automation Framework (Playwright) initialized");
     }
     
     async executeTask(task) {
@@ -59,26 +59,24 @@ class Agent {
         
         try {
             logger.info(`🎯 Executing task ID: ${task.taskId || task.id}`);
-            
             const instructions = task.prompt || task.test_instructions || 'Navigate and check page';
             
             // 0. Extract DOM Selector Context to assist the AI
             let domContext = "";
             try {
                 logger.info(`🔍 Fetching live DOM context from ${task.url} to guide the AI...`);
-                domContext = await this.puppeteerRunner.getDOMContext(task.url);
+                domContext = await this.playwrightRunner.getDOMContext(task.url);
             } catch (domErr) {
                 logger.warn(`⚠️ Could not retrieve live DOM context: ${domErr.message}`);
             }
 
-            // 1. Generate Puppeteer Script dynamically via AI
-            const scriptCode = await this.aiExecutor.generatePuppeteerScript(instructions, task.url, domContext);
+            // 1. Generate Playwright Script dynamically via AI
+            const scriptCode = await this.aiExecutor.generatePlaywrightScript(instructions, task.url, domContext);
             
             // 2. Execute the generated Script directly
-            const executionResult = await this.puppeteerRunner.executeDynamicScript(scriptCode, {
+            const executionResult = await this.playwrightRunner.executeDynamicScript(scriptCode, {
                 url: task.url,
-                taskId: task.taskId || task.id,
-                recordVideo: this.enableRecording
+                taskId: task.taskId || task.id
             });
             
             resultData.status = executionResult.success ? 'completed' : 'failed';
@@ -138,8 +136,8 @@ class Agent {
     
     async cleanup() {
         logger.info("🧹 Cleaning up agent...");
-        if (this.puppeteerRunner) {
-            await this.puppeteerRunner.close();
+        if (this.playwrightRunner) {
+            await this.playwrightRunner.close();
         }
         this.isRunning = false;
         this.emitStatus('offline');
@@ -155,16 +153,6 @@ class Agent {
                 action: status 
             });
         }
-    }
-    
-    on(event, callback) {
-        if (event === 'status') {
-            this.onStatusCallback = callback;
-        }
-    }
-    
-    getHistory() {
-        return this.taskHistory;
     }
 }
 
