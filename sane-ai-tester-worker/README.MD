@@ -22,7 +22,8 @@ Or with Electron GUI:
 bash
 npm run electron
 
-
+cmd- in run as admin to convert exe file
+$env:CSC_IDENTITY_AUTO_DISCOVERY="false"
 npm run pack
 
 ```
