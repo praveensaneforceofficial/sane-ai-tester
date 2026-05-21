@@ -131,6 +131,7 @@ npm --version
 ```batch
 cd sane-ai-tester-api
 npm install
+npm run dev
 ```
 
 ## Mac/Linux
@@ -138,6 +139,7 @@ npm install
 ```bash
 cd sane-ai-tester-api
 npm install
+npm run dev
 ```
 
 ---
