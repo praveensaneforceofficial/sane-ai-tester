@@ -1,0 +1,230 @@
+{
+  "info": {
+    "name": "Sane-AI Git Trigger API",
+    "_postman_id": "git-trigger-collection-001",
+    "description": "All Git Trigger endpoints for Sane-AI Tester API\nBase URL: http://uatai.saneforce.com",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://uatai.saneforce.com",
+      "type": "string"
+    },
+    {
+      "key": "trigger_id",
+      "value": "1",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Create Git Trigger (POST)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"branch\": \"feature/my-branch\",\n  \"repository\": \"sane-ai-tester\",\n  \"pr_number\": 42,\n  \"commit_sha\": \"abc123def456\",\n  \"author\": \"praveen\",\n  \"description\": \"Fixed login bug\",\n  \"comment\": \"Ready for review\",\n  \"action\": \"opened\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/tasks/git-trigger",
+          "host": ["{{base_url}}"],
+          "path": ["api", "tasks", "git-trigger"]
+        },
+        "description": "Create a new git trigger record.\n\nRequired fields:\n- branch (string)\n- repository (string)\n- pr_number (integer)\n- commit_sha (string)\n- author (string)\n\nOptional fields:\n- description (string)\n- comment (string)\n- action (string) — e.g. opened, closed, merged"
+      },
+      "response": [
+        {
+          "name": "201 - Trigger Created",
+          "status": "Created",
+          "code": 201,
+          "body": "{\n  \"id\": 1,\n  \"branch\": \"feature/my-branch\",\n  \"repository\": \"sane-ai-tester\",\n  \"pr_number\": 42,\n  \"commit_sha\": \"abc123def456\",\n  \"author\": \"praveen\",\n  \"description\": \"Fixed login bug\",\n  \"comment\": \"Ready for review\",\n  \"action\": \"opened\",\n  \"status\": \"pending\",\n  \"created_at\": \"2026-05-22T15:00:00.000Z\",\n  \"updated_at\": \"2026-05-22T15:00:00.000Z\"\n}"
+        },
+        {
+          "name": "400 - Missing Fields",
+          "status": "Bad Request",
+          "code": 400,
+          "body": "{\n  \"error\": \"Missing required webhook trigger fields: branch, repository, pr_number, commit_sha, author\"\n}"
+        },
+        {
+          "name": "503 - DB Not Available",
+          "status": "Service Unavailable",
+          "code": 503,
+          "body": "{\n  \"error\": \"Database not available. Please try again shortly.\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "2. Get All Git Triggers (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/tasks/git-triggers",
+          "host": ["{{base_url}}"],
+          "path": ["api", "tasks", "git-triggers"]
+        },
+        "description": "Get all git trigger records, ordered by created_at DESC (newest first)."
+      },
+      "response": [
+        {
+          "name": "200 - All Triggers",
+          "status": "OK",
+          "code": 200,
+          "body": "[\n  {\n    \"id\": 2,\n    \"branch\": \"main\",\n    \"repository\": \"sane-ai-tester\",\n    \"pr_number\": 43,\n    \"commit_sha\": \"xyz789\",\n    \"author\": \"praveen\",\n    \"description\": \"Release fix\",\n    \"comment\": null,\n    \"action\": \"merged\",\n    \"status\": \"completed\",\n    \"created_at\": \"2026-05-22T16:00:00.000Z\",\n    \"updated_at\": \"2026-05-22T16:05:00.000Z\"\n  },\n  {\n    \"id\": 1,\n    \"branch\": \"feature/my-branch\",\n    \"repository\": \"sane-ai-tester\",\n    \"pr_number\": 42,\n    \"commit_sha\": \"abc123def456\",\n    \"author\": \"praveen\",\n    \"description\": \"Fixed login bug\",\n    \"comment\": \"Ready for review\",\n    \"action\": \"opened\",\n    \"status\": \"pending\",\n    \"created_at\": \"2026-05-22T15:00:00.000Z\",\n    \"updated_at\": \"2026-05-22T15:00:00.000Z\"\n  }\n]"
+        },
+        {
+          "name": "503 - DB Not Available",
+          "status": "Service Unavailable",
+          "code": 503,
+          "body": "{\n  \"error\": \"Database not available. Please try again shortly.\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "3. Update Trigger Status (PUT)",
+      "request": {
+        "method": "PUT",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"status\": \"completed\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{base_url}}/api/tasks/git-triggers/{{trigger_id}}/status",
+          "host": ["{{base_url}}"],
+          "path": ["api", "tasks", "git-triggers", "{{trigger_id}}", "status"]
+        },
+        "description": "Update the status of a specific git trigger by ID.\n\nPath param:\n- trigger_id (integer) — the trigger record ID\n\nBody:\n- status (string) — e.g. pending, running, completed, failed"
+      },
+      "response": [
+        {
+          "name": "200 - Status Updated",
+          "status": "OK",
+          "code": 200,
+          "body": "{\n  \"id\": 1,\n  \"branch\": \"feature/my-branch\",\n  \"repository\": \"sane-ai-tester\",\n  \"pr_number\": 42,\n  \"commit_sha\": \"abc123def456\",\n  \"author\": \"praveen\",\n  \"description\": \"Fixed login bug\",\n  \"comment\": \"Ready for review\",\n  \"action\": \"opened\",\n  \"status\": \"completed\",\n  \"created_at\": \"2026-05-22T15:00:00.000Z\",\n  \"updated_at\": \"2026-05-22T16:10:00.000Z\"\n}"
+        },
+        {
+          "name": "400 - Missing Status",
+          "status": "Bad Request",
+          "code": 400,
+          "body": "{\n  \"error\": \"Missing required field: status\"\n}"
+        },
+        {
+          "name": "500 - Trigger Not Found",
+          "status": "Internal Server Error",
+          "code": 500,
+          "body": "{\n  \"error\": \"Trigger record not found\"\n}"
+        },
+        {
+          "name": "503 - DB Not Available",
+          "status": "Service Unavailable",
+          "code": 503,
+          "body": "{\n  \"error\": \"Database not available. Please try again shortly.\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "4. Delete Git Trigger (DELETE)",
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/tasks/git-triggers/{{trigger_id}}",
+          "host": ["{{base_url}}"],
+          "path": ["api", "tasks", "git-triggers", "{{trigger_id}}"]
+        },
+        "description": "Delete a specific git trigger record by ID.\n\nPath param:\n- trigger_id (integer) — the trigger record ID\n\nReturns 204 No Content on success."
+      },
+      "response": [
+        {
+          "name": "204 - Deleted Successfully",
+          "status": "No Content",
+          "code": 204,
+          "body": ""
+        },
+        {
+          "name": "500 - Trigger Not Found",
+          "status": "Internal Server Error",
+          "code": 500,
+          "body": "{\n  \"error\": \"Trigger record not found\"\n}"
+        },
+        {
+          "name": "503 - DB Not Available",
+          "status": "Service Unavailable",
+          "code": 503,
+          "body": "{\n  \"error\": \"Database not available. Please try again shortly.\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "5. DB Status Check (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/db-status",
+          "host": ["{{base_url}}"],
+          "path": ["api", "db-status"]
+        },
+        "description": "Check if the database is currently connected. Use this to diagnose DB issues."
+      },
+      "response": [
+        {
+          "name": "200 - DB Connected",
+          "status": "OK",
+          "code": 200,
+          "body": "{\n  \"connected\": true,\n  \"host\": \"94.249.213.61\",\n  \"port\": \"5432\",\n  \"database\": \"aiDev\",\n  \"timestamp\": \"2026-05-22T15:00:00.000Z\"\n}"
+        },
+        {
+          "name": "200 - DB Not Connected",
+          "status": "OK",
+          "code": 200,
+          "body": "{\n  \"connected\": false,\n  \"host\": \"94.249.213.61\",\n  \"port\": \"5432\",\n  \"database\": \"aiDev\",\n  \"timestamp\": \"2026-05-22T15:00:00.000Z\"\n}"
+        }
+      ]
+    },
+    {
+      "name": "6. Health Check (GET)",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/api/health",
+          "host": ["{{base_url}}"],
+          "path": ["api", "health"]
+        },
+        "description": "Basic health check — always returns 200 if server is running."
+      },
+      "response": [
+        {
+          "name": "200 - Healthy",
+          "status": "OK",
+          "code": 200,
+          "body": "{\n  \"status\": \"healthy\",\n  \"db_status\": \"connected\",\n  \"timestamp\": \"2026-05-22T15:00:00.000Z\"\n}"
+        }
+      ]
+    }
+  ]
+}
