@@ -4,40 +4,44 @@ const db = require('../config/database');
 class HealthController {
     healthCheck(req, res) {
         res.json({ 
-            status: 'healthy', 
+            status: 'healthy',
+            db_status: db.isConnected() ? 'connected' : 'disconnected',
             timestamp: new Date().toISOString() 
         });
     }
 
     async detailedHealthCheck(req, res) {
+        const dbConnected = db.isConnected();
+        let dbPing = false;
         try {
-            // Check DB
-            const dbCheck = await db.query('SELECT 1');
-            
-            res.json({
-                status: 'healthy',
-                timestamp: new Date().toISOString(),
-                database: dbCheck ? 'connected' : 'disconnected',
-                system: {
-                    uptime: os.uptime(),
-                    platform: os.platform(),
-                    memory: {
-                        total: os.totalmem(),
-                        free: os.freemem()
-                    },
-                    load: os.loadavg()
-                }
-            });
+            if (dbConnected) {
+                await db.query('SELECT 1');
+                dbPing = true;
+            }
         } catch (err) {
-            res.status(500).json({ 
-                status: 'unhealthy', 
-                error: err.message,
-                timestamp: new Date().toISOString()
-            });
+            dbPing = false;
         }
+
+        res.json({
+            status: dbPing ? 'healthy' : 'degraded',
+            timestamp: new Date().toISOString(),
+            database: dbPing ? 'connected' : 'disconnected',
+            system: {
+                uptime: os.uptime(),
+                platform: os.platform(),
+                memory: {
+                    total: os.totalmem(),
+                    free: os.freemem()
+                },
+                load: os.loadavg()
+            }
+        });
     }
 
     async getSystemMetrics(req, res) {
+        if (!db.isConnected()) {
+            return res.status(503).json({ error: 'Database not available. Please try again shortly.' });
+        }
         try {
             const metrics = await db.query(`
                 SELECT 
@@ -55,6 +59,9 @@ class HealthController {
     }
 
     async getWorkerHealth(req, res) {
+        if (!db.isConnected()) {
+            return res.status(503).json({ error: 'Database not available. Please try again shortly.' });
+        }
         try {
             const workers = await db.query(`
                 SELECT 
@@ -70,6 +77,9 @@ class HealthController {
     }
 
     async refreshStatus(req, res) {
+        if (!db.isConnected()) {
+            return res.status(503).json({ error: 'Database not available. Please try again shortly.' });
+        }
         try {
             const workerRepository = require('../repositories/workerRepository');
             const offlineWorkers = await workerRepository.markOfflineInactive();

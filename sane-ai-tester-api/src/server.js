@@ -17,7 +17,7 @@ const configRoutes = require('./routes/config.routes');
 const healthRoutes = require('./routes/health.routes');
 const { router: sprintRoutes } = require('./routes/sprint.routes');
 const customTaskRoutes = require('./routes/customTask.routes');
-
+const APP_VERSION = '22-MAY-2026-BUILD-1';
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server, { 
@@ -46,6 +46,14 @@ app.use('/api/custom-tasks', customTaskRoutes);
 app.use('/api', healthRoutes);
 app.use('/api', sprintRoutes);
 
+app.get('/version', (req, res) => {
+    res.json({
+        version: APP_VERSION,
+        time: new Date(),
+        pid: process.pid
+    });
+});
+
 // Initialize Database
 database.connect();
 
@@ -59,6 +67,11 @@ const workerRepository = require('./repositories/workerRepository');
 
 const startWorkerHealthChecker = () => {
     setInterval(async () => {
+        // Skip health check if DB is not connected
+        if (!database.isConnected()) {
+            console.log('⏰ Health Check: Skipped — DB not connected');
+            return;
+        }
         try {
             const markedOffline = await workerRepository.markOfflineInactive();
             if (markedOffline.length > 0) {
@@ -85,6 +98,15 @@ startWorkerHealthChecker();
 // Error handling
 server.on('error', (error) => {
     console.error('❌ Server error:', error);
+});
+
+// Global crash protection
+process.on('uncaughtException', (err) => {
+    console.error('❌ Uncaught Exception (server kept alive):', err.message);
+});
+
+process.on('unhandledRejection', (reason) => {
+    console.error('❌ Unhandled Promise Rejection (server kept alive):', reason);
 });
 
 // Graceful shutdown
