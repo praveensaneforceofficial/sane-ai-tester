@@ -37,6 +37,26 @@ class Database {
                 } catch (dbErr) {
                     console.error('❌ Failed to initialize custom_task_actions table:', dbErr);
                 }
+
+                // Initialize git_triggers table if not exists
+                try {
+                    await this.pool.query(`
+                        CREATE TABLE IF NOT EXISTS git_triggers (
+                            id SERIAL PRIMARY KEY,
+                            branch VARCHAR(255) NOT NULL,
+                            repository VARCHAR(255) NOT NULL,
+                            pr_number INT NOT NULL,
+                            commit_sha VARCHAR(100) NOT NULL,
+                            author VARCHAR(100) NOT NULL,
+                            status VARCHAR(50) DEFAULT 'pending',
+                            created_at TIMESTAMP DEFAULT NOW(),
+                            updated_at TIMESTAMP DEFAULT NOW()
+                        );
+                    `);
+                    console.log('✅ Checked and ensured git_triggers table exists.');
+                } catch (dbErr) {
+                    console.error('❌ Failed to initialize git_triggers table:', dbErr);
+                }
             }
         });
     }

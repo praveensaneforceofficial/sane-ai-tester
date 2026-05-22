@@ -1,6 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const taskController = require('../controllers/taskController');
+const gitTriggerController = require('../controllers/gitTriggerController');
+
+// Git Webhook Trigger Routes
+router.post('/git-trigger', gitTriggerController.handleGitTrigger);
+router.get('/git-triggers', gitTriggerController.getAllTriggers);
+router.put('/git-triggers/:id/status', gitTriggerController.updateTriggerStatus);
+router.delete('/git-triggers/:id', gitTriggerController.deleteTrigger);
 
 router.post('/', taskController.createTask);
 router.get('/', taskController.getAllTasks);

@@ -425,3 +425,17 @@ CREATE TABLE zoho_webhook_logs (
 CREATE INDEX idx_zoho_webhook_ticket ON zoho_webhook_logs(ticket_id);
 CREATE INDEX idx_zoho_webhook_processed ON zoho_webhook_logs(processed);
 CREATE INDEX idx_zoho_webhook_received ON zoho_webhook_logs(received_at);
+
+21. git_triggers - GitHub Webhook Triggers
+sql
+CREATE TABLE git_triggers (
+    id SERIAL PRIMARY KEY,
+    branch VARCHAR(255) NOT NULL,
+    repository VARCHAR(255) NOT NULL,
+    pr_number INT NOT NULL,
+    commit_sha VARCHAR(100) NOT NULL,
+    author VARCHAR(100) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);

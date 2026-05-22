@@ -405,4 +405,14 @@ ON CONFLICT (config_key) DO NOTHING;
 
 
 
-	
+	CREATE TABLE IF NOT EXISTS git_triggers (
+    id SERIAL PRIMARY KEY,
+    branch VARCHAR(255) NOT NULL,
+    repository VARCHAR(255) NOT NULL,
+    pr_number INT NOT NULL,
+    commit_sha VARCHAR(100) NOT NULL,
+    author VARCHAR(100) NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP DEFAULT NOW(),
+    updated_at TIMESTAMP DEFAULT NOW()
+);
