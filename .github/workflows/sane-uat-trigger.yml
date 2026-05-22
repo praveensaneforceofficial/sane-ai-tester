@@ -1,0 +1,58 @@
+name: Sane AI Tester - UAT Webhook Trigger
+
+on:
+  # 1. Pull Request raised or description edited - only UAT branch
+  pull_request:
+    branches:
+      - UAT
+    types: [opened, edited, synchronize, reopened]
+
+  # 2. Comment added on a PR - only triggers on UAT PRs (filtered by job condition)
+  issue_comment:
+    types: [created]
+
+jobs:
+  trigger-api:
+    name: Send PR Details to Sane API
+    runs-on: ubuntu-latest
+
+    # For issue_comment: only run if comment is on a Pull Request (not a plain Issue)
+    # For pull_request: always run (already filtered to UAT branch above)
+    if: >
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'issue_comment' && github.event.issue.pull_request != null)
+
+    steps:
+      - name: Determine Event Details
+        id: event_details
+        run: |
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            echo "PR_NUMBER=${{ github.event.pull_request.number }}" >> $GITHUB_OUTPUT
+            echo "BRANCH=${{ github.event.pull_request.head.ref }}" >> $GITHUB_OUTPUT
+            echo "COMMIT_SHA=${{ github.event.pull_request.head.sha }}" >> $GITHUB_OUTPUT
+            echo "DESCRIPTION=${{ github.event.pull_request.body }}" >> $GITHUB_OUTPUT
+            echo "COMMENT=" >> $GITHUB_OUTPUT
+            echo "ACTION=${{ github.event.action }}" >> $GITHUB_OUTPUT
+          else
+            echo "PR_NUMBER=${{ github.event.issue.number }}" >> $GITHUB_OUTPUT
+            echo "BRANCH=${{ github.event.issue.title }}" >> $GITHUB_OUTPUT
+            echo "COMMIT_SHA=${{ github.sha }}" >> $GITHUB_OUTPUT
+            echo "DESCRIPTION=" >> $GITHUB_OUTPUT
+            echo "COMMENT=${{ github.event.comment.body }}" >> $GITHUB_OUTPUT
+            echo "ACTION=comment_added" >> $GITHUB_OUTPUT
+          fi
+
+      - name: HTTP POST Trigger to Sane API
+        run: |
+          curl -X POST "${{ secrets.SANE_API_URL }}/api/tasks/git-trigger" \
+          -H "Content-Type: application/json" \
+          -d '{
+            "branch": "${{ github.event.pull_request.head.ref || github.event.issue.title }}",
+            "repository": "${{ github.repository }}",
+            "pr_number": ${{ github.event.pull_request.number || github.event.issue.number }},
+            "commit_sha": "${{ github.event.pull_request.head.sha || github.sha }}",
+            "author": "${{ github.actor }}",
+            "description": "${{ github.event.pull_request.body }}",
+            "comment": "${{ github.event.comment.body }}",
+            "action": "${{ github.event.action }}"
+          }'

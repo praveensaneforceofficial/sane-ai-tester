@@ -233,6 +233,9 @@ CREATE TABLE IF NOT EXISTS git_triggers (
     pr_number INT NOT NULL,
     commit_sha VARCHAR(100) NOT NULL,
     author VARCHAR(100) NOT NULL,
+    description TEXT,
+    comment TEXT,
+    action VARCHAR(50),
     status VARCHAR(50) DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()
@@ -242,15 +245,3 @@ CREATE TABLE IF NOT EXISTS git_triggers (
 INSERT INTO app_users (username, password, role) 
 VALUES ('admin', 'saneai@2024', 'admin')
 ON CONFLICT (username) DO NOTHING;
-
-CREATE TABLE IF NOT EXISTS git_triggers (
-    id SERIAL PRIMARY KEY,
-    branch VARCHAR(255) NOT NULL,
-    repository VARCHAR(255) NOT NULL,
-    pr_number INT NOT NULL,
-    commit_sha VARCHAR(100) NOT NULL,
-    author VARCHAR(100) NOT NULL,
-    status VARCHAR(50) DEFAULT 'pending',
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-);

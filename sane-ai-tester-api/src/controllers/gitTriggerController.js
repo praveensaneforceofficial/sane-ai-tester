@@ -3,7 +3,7 @@ const gitTriggerService = require('../services/gitTriggerService');
 class GitTriggerController {
     async handleGitTrigger(req, res) {
         try {
-            const { branch, repository, pr_number, commit_sha, author } = req.body;
+            const { branch, repository, pr_number, commit_sha, author, description, comment, action } = req.body;
             if (!branch || !repository || pr_number === undefined || !commit_sha || !author) {
                 return res.status(400).json({ error: 'Missing required webhook trigger fields: branch, repository, pr_number, commit_sha, author' });
             }
@@ -12,7 +12,10 @@ class GitTriggerController {
                 repository,
                 pr_number,
                 commit_sha,
-                author
+                author,
+                description,
+                comment,
+                action
             });
             res.status(201).json(trigger);
         } catch (err) {

@@ -3,12 +3,12 @@ const GitTriggerModel = require('../models/gitTrigger.model');
 
 class GitTriggerRepository {
     async create(triggerData) {
-        const { branch, repository, pr_number, commit_sha, author, status = 'pending' } = triggerData;
+        const { branch, repository, pr_number, commit_sha, author, description = null, comment = null, action = null, status = 'pending' } = triggerData;
         const result = await db.query(
-            `INSERT INTO git_triggers (branch, repository, pr_number, commit_sha, author, status, created_at, updated_at) 
-             VALUES ($1, $2, $3, $4, $5, $6, NOW(), NOW()) 
+            `INSERT INTO git_triggers (branch, repository, pr_number, commit_sha, author, description, comment, action, status, created_at, updated_at) 
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW()) 
              RETURNING *`,
-            [branch, repository, pr_number, commit_sha, author, status]
+            [branch, repository, pr_number, commit_sha, author, description, comment, action, status]
         );
         return new GitTriggerModel(result.rows[0]);
     }

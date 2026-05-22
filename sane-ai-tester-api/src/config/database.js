@@ -48,14 +48,21 @@ class Database {
                             pr_number INT NOT NULL,
                             commit_sha VARCHAR(100) NOT NULL,
                             author VARCHAR(100) NOT NULL,
+                            description TEXT,
+                            comment TEXT,
+                            action VARCHAR(50),
                             status VARCHAR(50) DEFAULT 'pending',
                             created_at TIMESTAMP DEFAULT NOW(),
                             updated_at TIMESTAMP DEFAULT NOW()
                         );
+                        
+                        ALTER TABLE git_triggers ADD COLUMN IF NOT EXISTS description TEXT;
+                        ALTER TABLE git_triggers ADD COLUMN IF NOT EXISTS comment TEXT;
+                        ALTER TABLE git_triggers ADD COLUMN IF NOT EXISTS action VARCHAR(50);
                     `);
-                    console.log('✅ Checked and ensured git_triggers table exists.');
+                    console.log('✅ Checked and ensured git_triggers table exists with updated columns.');
                 } catch (dbErr) {
-                    console.error('❌ Failed to initialize git_triggers table:', dbErr);
+                    console.error('❌ Failed to initialize/alter git_triggers table:', dbErr);
                 }
             }
         });

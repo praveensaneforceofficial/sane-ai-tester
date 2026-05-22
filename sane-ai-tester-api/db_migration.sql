@@ -435,6 +435,9 @@ CREATE TABLE git_triggers (
     pr_number INT NOT NULL,
     commit_sha VARCHAR(100) NOT NULL,
     author VARCHAR(100) NOT NULL,
+    description TEXT,
+    comment TEXT,
+    action VARCHAR(50),
     status VARCHAR(50) DEFAULT 'pending',
     created_at TIMESTAMP DEFAULT NOW(),
     updated_at TIMESTAMP DEFAULT NOW()

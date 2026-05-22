@@ -6,6 +6,9 @@ class GitTriggerModel {
         this.prNumber = data.pr_number || data.prNumber;
         this.commitSha = data.commit_sha || data.commitSha;
         this.author = data.author;
+        this.description = data.description;
+        this.comment = data.comment;
+        this.action = data.action;
         this.status = data.status;
         this.createdAt = data.created_at || data.createdAt;
         this.updatedAt = data.updated_at || data.updatedAt;
@@ -19,6 +22,9 @@ class GitTriggerModel {
             pr_number: this.prNumber,
             commit_sha: this.commitSha,
             author: this.author,
+            description: this.description,
+            comment: this.comment,
+            action: this.action,
             status: this.status,
             created_at: this.createdAt,
             updated_at: this.updatedAt
