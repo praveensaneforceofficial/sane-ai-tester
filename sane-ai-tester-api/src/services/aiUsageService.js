@@ -1,4 +1,5 @@
 const aiUsageRepository = require('../repositories/aiUsageRepository');
+const brainBridge = require('./brainWebSocketBridge');
 
 class AiUsageService {
     async getAll() {
@@ -11,7 +12,15 @@ class AiUsageService {
             usageData.usage_id = `usage-${Date.now()}`;
         }
         const log = await aiUsageRepository.create(usageData);
-        return log.toJSON();
+        const logJson = log.toJSON();
+        
+        if (brainBridge.io) {
+            brainBridge.io.emit('update-brain');
+            brainBridge.io.emit('dashboard:update');
+            brainBridge.io.emit('ai-usage:logged', logJson);
+        }
+        
+        return logJson;
     }
 
     async getSummary() {

@@ -2,7 +2,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 
 const api = axios.create({
-  baseURL: '/brain_api', // Points to Python FastAPI in IIS
+  baseURL: '/api', // Points to Node.js Central API
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',
@@ -64,8 +64,8 @@ export const customTaskApi = {
   create: (data) => api.post('/custom-tasks', data),
   updateStatus: (customTaskId, status) => api.put(`/custom-tasks/${customTaskId}/status`, { status }),
   delete: (customTaskId) => api.delete(`/custom-tasks/${customTaskId}`),
-  startBrainAgent: () => api.post('/custom-tasks/start-brain-agent'),
-  checkAi: () => api.get('/custom-tasks/check-ai'),
+  startBrainAgent: () => api.post('/brain/trigger-orchestration'),
+  checkAi: () => api.get('/brain/check-ai'),
   getActions: (customTaskId) => api.get(`/custom-tasks/${customTaskId}/actions`),
 }
 
@@ -81,7 +81,7 @@ export const projectApi = {
 
 // Analytics endpoints
 export const analyticsApi = {
-  getDashboardStats: () => api.get('/dashboard/stats'),
+  getDashboardStats: () => api.get('/analytics/dashboard'),
   getTokenUsage: (days = 7) => api.get('/analytics/token-usage', { params: { days } }),
   getWorkerPerformance: () => api.get('/analytics/worker-performance'),
   getDailyMetrics: (days = 7) => api.get('/analytics/daily-metrics', { params: { days } }),

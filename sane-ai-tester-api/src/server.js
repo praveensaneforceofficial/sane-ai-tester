@@ -17,6 +17,7 @@ const configRoutes = require('./routes/config.routes');
 const healthRoutes = require('./routes/health.routes');
 const { router: sprintRoutes } = require('./routes/sprint.routes');
 const customTaskRoutes = require('./routes/customTask.routes');
+const brainRoutes = require('./routes/brain.routes');
 const APP_VERSION = '22-MAY-2026-BUILD-1';
 const app = express();
 const server = http.createServer(app);
@@ -43,6 +44,7 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/ai-usage', aiUsageRoutes);
 app.use('/api/config', configRoutes);
 app.use('/api/custom-tasks', customTaskRoutes);
+app.use('/api/brain', brainRoutes);
 app.use('/api', healthRoutes);
 app.use('/api', sprintRoutes);
 
@@ -60,6 +62,10 @@ database.connect();
 // Initialize WebSocket
 const socketManager = new SocketManager(io);
 socketManager.initialize();
+
+// Initialize Brain WebSocket Bridge
+const brainBridge = require('./services/brainWebSocketBridge');
+brainBridge.initialize(io);
 
 // ⏰ Worker Health Checker — runs every 60 seconds
 // Marks workers offline if they haven't sent a heartbeat in 60s

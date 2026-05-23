@@ -9,4 +9,9 @@ router.get('/errors', analyticsController.getErrorAnalytics);
 router.get('/success-rate', analyticsController.getSuccessRate);
 router.get('/projects', analyticsController.getProjectAnalytics);
 
+// Brain-equivalent analytics — now served directly from DB
+router.get('/token-usage', analyticsController.getTokenUsage);
+router.get('/daily-metrics', analyticsController.getDailyMetrics);
+router.get('/worker-performance', analyticsController.getWorkerPerformance);
+
 module.exports = router;

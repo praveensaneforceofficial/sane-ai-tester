@@ -72,6 +72,36 @@ class ReportController {
             res.status(500).json({ error: err.message });
         }
     }
+
+    async getTestSummary(req, res) {
+        try {
+            const { project_name, start_date, end_date } = req.query;
+            const summary = await reportService.getTestSummary(project_name, start_date, end_date);
+            res.json(summary);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async getFailedTests(req, res) {
+        try {
+            const limit = parseInt(req.query.limit || 50);
+            const failedTests = await reportService.getFailedTests(limit);
+            res.json(failedTests);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async exportReport(req, res) {
+        try {
+            const result = await reportService.exportReport(req.body);
+            res.json(result);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
 }
 
 module.exports = new ReportController();
+

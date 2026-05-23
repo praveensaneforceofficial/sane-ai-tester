@@ -54,27 +54,11 @@ app.add_middleware(
 )
 
 # Include routers
-from routes import dashboard as dashboard_router
-from routes import auth as auth_router
-from routes import workers as workers_router
-from routes import tasks as tasks_router
-from routes import analytics as analytics_router
-from routes import reports as reports_router
 from routes import health as health_router
-from routes import projects as projects_router
-from routes import sprints as sprints_router
-from routes import custom_tasks as custom_tasks_router
+from routes import ws_bridge as ws_bridge_router
 
-app.include_router(dashboard_router.router, prefix="/brain_api", tags=["Dashboard"])
-app.include_router(auth_router.router, prefix="/brain_api", tags=["Auth"])
-app.include_router(workers_router.router, prefix="/brain_api", tags=["Workers"])
-app.include_router(tasks_router.router, prefix="/brain_api", tags=["Tasks"])
-app.include_router(analytics_router.router, prefix="/brain_api", tags=["Analytics"])
-app.include_router(reports_router.router, prefix="/brain_api", tags=["Reports"])
 app.include_router(health_router.router, prefix="/brain_api", tags=["Health"])
-app.include_router(projects_router.router, prefix="/brain_api", tags=["Projects"])
-app.include_router(sprints_router.router, prefix="/brain_api", tags=["Sprints"])
-app.include_router(custom_tasks_router.router, prefix="/brain_api", tags=["Custom Tasks"])
+app.include_router(ws_bridge_router.router, tags=["WebSocket Bridge"])
 
 @app.get("/")
 async def root():

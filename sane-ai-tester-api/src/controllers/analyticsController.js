@@ -54,6 +54,36 @@ class AnalyticsController {
             res.status(500).json({ error: err.message });
         }
     }
+
+    async getTokenUsage(req, res) {
+        try {
+            const days = parseInt(req.query.days || 7);
+            const usage = await analyticsService.getTokenUsage(days);
+            res.json(usage);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async getDailyMetrics(req, res) {
+        try {
+            const days = parseInt(req.query.days || 7);
+            const metrics = await analyticsService.getDailyMetrics(days);
+            res.json(metrics);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
+
+    async getWorkerPerformance(req, res) {
+        try {
+            const performance = await analyticsService.getWorkerPerformance();
+            res.json(performance);
+        } catch (err) {
+            res.status(500).json({ error: err.message });
+        }
+    }
 }
 
 module.exports = new AnalyticsController();
+
