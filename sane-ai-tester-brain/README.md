@@ -23,7 +23,7 @@ python src/main.py
 # OR using uvicorn directly
 uvicorn src.main:app --reload --port 8000 --host 0.0.0.0
 
-
+pyinstaller --noconsole --onefile --name "SaneAI-Brain" --distpath ".\release" brain_gui.pyw
 
 
 # start
