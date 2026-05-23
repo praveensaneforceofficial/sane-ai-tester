@@ -4,8 +4,8 @@ import os
 
 class Settings(BaseSettings):
     # API Bridge
-    API_URL: str = "http://localhost:3000"
-    API_WS_URL: str = "ws://localhost:3000"
+    API_URL: str = "http://uatai.saneforce.com"
+    API_WS_URL: str = "ws://uatai.saneforce.com"
     
     # Brain Server
     BRAIN_PORT: int = 8000

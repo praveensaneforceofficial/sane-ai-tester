@@ -2,7 +2,7 @@ import axios from 'axios'
 import toast from 'react-hot-toast'
 
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: '/brain_api', // Points to Python FastAPI in IIS
   timeout: 30000,
   headers: {
     'Content-Type': 'application/json',

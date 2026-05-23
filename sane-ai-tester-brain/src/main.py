@@ -65,16 +65,16 @@ from routes import projects as projects_router
 from routes import sprints as sprints_router
 from routes import custom_tasks as custom_tasks_router
 
-app.include_router(dashboard_router.router, prefix="/api", tags=["Dashboard"])
-app.include_router(auth_router.router, prefix="/api", tags=["Auth"])
-app.include_router(workers_router.router, prefix="/api", tags=["Workers"])
-app.include_router(tasks_router.router, prefix="/api", tags=["Tasks"])
-app.include_router(analytics_router.router, prefix="/api", tags=["Analytics"])
-app.include_router(reports_router.router, prefix="/api", tags=["Reports"])
-app.include_router(health_router.router, prefix="/api", tags=["Health"])
-app.include_router(projects_router.router, prefix="/api", tags=["Projects"])
-app.include_router(sprints_router.router, prefix="/api", tags=["Sprints"])
-app.include_router(custom_tasks_router.router, prefix="/api", tags=["Custom Tasks"])
+app.include_router(dashboard_router.router, prefix="/brain_api", tags=["Dashboard"])
+app.include_router(auth_router.router, prefix="/brain_api", tags=["Auth"])
+app.include_router(workers_router.router, prefix="/brain_api", tags=["Workers"])
+app.include_router(tasks_router.router, prefix="/brain_api", tags=["Tasks"])
+app.include_router(analytics_router.router, prefix="/brain_api", tags=["Analytics"])
+app.include_router(reports_router.router, prefix="/brain_api", tags=["Reports"])
+app.include_router(health_router.router, prefix="/brain_api", tags=["Health"])
+app.include_router(projects_router.router, prefix="/brain_api", tags=["Projects"])
+app.include_router(sprints_router.router, prefix="/brain_api", tags=["Sprints"])
+app.include_router(custom_tasks_router.router, prefix="/brain_api", tags=["Custom Tasks"])
 
 @app.get("/")
 async def root():
