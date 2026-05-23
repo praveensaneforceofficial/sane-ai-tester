@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Toaster, toast } from 'react-hot-toast'
+import { Toaster, ToastBar, toast } from 'react-hot-toast'
 import Sidebar from './components/Layout/Sidebar'
 import Header from './components/Layout/Header'
 import Dashboard from './pages/Dashboard'
@@ -59,7 +59,28 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      <Toaster position="top-right" />
+      <Toaster position="top-right">
+        {(t) => (
+          <ToastBar toast={t}>
+            {({ icon, message }) => (
+              <>
+                {icon}
+                {message}
+                {t.type !== 'loading' && (
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                    className="flex items-center justify-center p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors font-bold text-[10px] focus:outline-none ml-1.5 cursor-pointer"
+                    style={{ width: 18, height: 18, minWidth: 18, border: 'none', background: 'none' }}
+                    aria-label="Dismiss toast"
+                  >
+                    ✕
+                  </button>
+                )}
+              </>
+            )}
+          </ToastBar>
+        )}
+      </Toaster>
       <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
       
       <div className="flex-1 flex flex-col overflow-hidden">
