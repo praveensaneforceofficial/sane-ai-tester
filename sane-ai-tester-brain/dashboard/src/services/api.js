@@ -85,6 +85,7 @@ export const analyticsApi = {
   getTokenUsage: (days = 7) => api.get('/analytics/token-usage', { params: { days } }),
   getWorkerPerformance: () => api.get('/analytics/worker-performance'),
   getDailyMetrics: (days = 7) => api.get('/analytics/daily-metrics', { params: { days } }),
+  getProjectAnalytics: () => api.get('/analytics/projects'),
 }
 
 // Report endpoints

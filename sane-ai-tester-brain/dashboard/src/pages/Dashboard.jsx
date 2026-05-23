@@ -6,17 +6,19 @@ import Charts from '../components/Dashboard/Charts'
 import ActiveThreads from '../components/Dashboard/ActiveThreads'
 import SystemHealth from '../components/Dashboard/SystemHealth'
 import HeroBanner from '../components/Dashboard/HeroBanner'
+import TokenUsageChart from '../components/Dashboard/TokenUsageChart'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
 
 function Dashboard() {
   const { workers, loading: workersLoading, fetchWorkers } = useWorkerStore()
-  const { metrics, fetchMetrics } = useAnalyticsStore()
+  const { metrics, fetchMetrics, fetchTokenUsage } = useAnalyticsStore()
   const [isLoading, setIsLoading] = useState(true)
   
   useEffect(() => {
     const loadData = async () => {
       setIsLoading(true)
       await Promise.all([fetchWorkers(), fetchMetrics()])
+      fetchTokenUsage(7)   // load token data in background (non-blocking)
       setIsLoading(false)
     }
     loadData()
@@ -41,6 +43,12 @@ function Dashboard() {
           <SystemHealth onlineCount={onlineCount} totalWorkers={totalWorkers} />
         </div>
       </div>
+
+      {/* Token Usage Section */}
+      <div className="card p-6">
+        <TokenUsageChart />
+      </div>
+
       <ActiveThreads workers={workers} />
     </div>
   )

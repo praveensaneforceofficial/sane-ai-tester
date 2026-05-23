@@ -81,40 +81,87 @@ class AnalyticsService {
     }
 
     async getTokenUsage(days = 7) {
-        // Query actual token usage from ai_api_usage
-        const result = await db.query(`
-            SELECT 
-                DATE(timestamp) as date,
-                SUM(tokens_used) as tokens
+        // 1. Daily totals by api_type
+        const dailyResult = await db.query(`
+            SELECT
+                TO_CHAR(DATE(timestamp), 'YYYY-MM-DD') as date,
+                api_type,
+                SUM(tokens_used)      as total_tokens,
+                SUM(prompt_tokens)    as prompt_tokens,
+                SUM(completion_tokens) as completion_tokens
             FROM ai_api_usage
             WHERE timestamp > NOW() - CAST($1 || ' days' AS INTERVAL)
-            GROUP BY DATE(timestamp)
+            GROUP BY DATE(timestamp), api_type
             ORDER BY date ASC
         `, [days]);
 
-        const dailyUsage = result.rows.map(r => parseInt(r.tokens || 0));
-        
-        // Sum total used
-        const totalUsedResult = await db.query(`
-            SELECT SUM(tokens_used) as used FROM ai_api_usage
+        // 2. Overall summary
+        const summaryResult = await db.query(`
+            SELECT
+                api_type,
+                COUNT(*)                          as call_count,
+                SUM(tokens_used)                  as total_tokens,
+                SUM(prompt_tokens)                as prompt_tokens,
+                SUM(completion_tokens)            as completion_tokens,
+                ROUND(AVG(request_duration))      as avg_duration_ms,
+                COUNT(CASE WHEN success THEN 1 END) as success_count
+            FROM ai_api_usage
+            GROUP BY api_type
         `);
-        const used = parseInt(totalUsedResult.rows[0]?.used || 0);
-        
-        // Return structured data (with fallback defaults if empty)
-        const totalBudget = 1000000; // e.g. 1M token limit
+
+        // 3. Last 10 recent calls
+        const recentResult = await db.query(`
+            SELECT usage_id, api_type, tokens_used, prompt_tokens,
+                   completion_tokens, request_duration, success, timestamp
+            FROM ai_api_usage
+            ORDER BY timestamp DESC
+            LIMIT 10
+        `);
+
+        // Build date-keyed map for chart labels
+        const dateMap = {};
+        for (const row of dailyResult.rows) {
+            if (!dateMap[row.date]) dateMap[row.date] = { openai: 0, ollama: 0 };
+            dateMap[row.date][row.api_type] = parseInt(row.total_tokens || 0);
+        }
+        const labels = Object.keys(dateMap).sort();
+        const openaiDaily  = labels.map(d => dateMap[d].openai  || 0);
+        const ollamaDaily  = labels.map(d => dateMap[d].ollama  || 0);
+
+        const summary = summaryResult.rows.map(r => ({
+            api_type:         r.api_type,
+            call_count:       parseInt(r.call_count || 0),
+            total_tokens:     parseInt(r.total_tokens || 0),
+            prompt_tokens:    parseInt(r.prompt_tokens || 0),
+            completion_tokens:parseInt(r.completion_tokens || 0),
+            avg_duration_ms:  parseInt(r.avg_duration_ms || 0),
+            success_count:    parseInt(r.success_count || 0),
+        }));
+
+        const totals = summary.reduce((acc, s) => ({
+            total_tokens:      acc.total_tokens      + s.total_tokens,
+            prompt_tokens:     acc.prompt_tokens     + s.prompt_tokens,
+            completion_tokens: acc.completion_tokens + s.completion_tokens,
+            call_count:        acc.call_count        + s.call_count,
+        }), { total_tokens: 0, prompt_tokens: 0, completion_tokens: 0, call_count: 0 });
+
         return {
-            used: used || 7200,
-            remaining: Math.max(0, totalBudget - used) || 2800,
-            total: totalBudget,
-            daily: dailyUsage.length > 0 ? dailyUsage : [1200, 800, 1500, 900, 1100, 700, 1000].slice(0, days)
+            labels,
+            openaiDaily,
+            ollamaDaily,
+            summary,
+            totals,
+            recent: recentResult.rows,
         };
     }
 
     async getDailyMetrics(days = 7) {
-        // Query task count per day
+        // Query completed, failed and total task counts per day
         const result = await db.query(`
             SELECT 
                 TO_CHAR(created_at, 'YYYY-MM-DD') as date,
+                COUNT(CASE WHEN status = 'completed' THEN 1 END) as completed,
+                COUNT(CASE WHEN status = 'failed' THEN 1 END) as failed,
                 COUNT(*) as tasks
             FROM tasks
             WHERE created_at > NOW() - CAST($1 || ' days' AS INTERVAL)
@@ -129,13 +176,15 @@ class AnalyticsService {
                 const date = new Date();
                 date.setDate(date.getDate() - i);
                 const dateStr = date.toISOString().split('T')[0];
-                metrics.push({ date: dateStr, tasks: 0 });
+                metrics.push({ date: dateStr, completed: 0, failed: 0, tasks: 0 });
             }
             return metrics;
         }
 
         return result.rows.map(r => ({
             date: r.date,
+            completed: parseInt(r.completed || 0),
+            failed: parseInt(r.failed || 0),
             tasks: parseInt(r.tasks || 0)
         }));
     }

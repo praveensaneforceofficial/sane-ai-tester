@@ -9,6 +9,30 @@ const brainBridge = require('../services/brainWebSocketBridge');
  * Node.js forwards the request to Brain via WebSocket.
  */
 
+/**
+ * Waits up to `timeoutMs` for the brain bridge to connect.
+ * Polls every 500 ms so transient startup delays don't
+ * immediately cause a 503.
+ */
+function waitForConnection(timeoutMs = 5000) {
+    return new Promise((resolve) => {
+        if (brainBridge.isConnected) return resolve(true);
+        const interval = 500;
+        let elapsed = 0;
+        const timer = setInterval(() => {
+            elapsed += interval;
+            if (brainBridge.isConnected) {
+                clearInterval(timer);
+                return resolve(true);
+            }
+            if (elapsed >= timeoutMs) {
+                clearInterval(timer);
+                return resolve(false);
+            }
+        }, interval);
+    });
+}
+
 // GET /api/brain/status
 // Returns whether the Node.js → Brain WebSocket is connected.
 router.get('/status', (req, res) => {
@@ -25,12 +49,14 @@ router.get('/status', (req, res) => {
 
 // POST /api/brain/trigger-orchestration
 // Triggers the full Brain Agent AI orchestration pipeline.
-// Brain will: validate TODO tasks → write test cases → assign to workers → evaluate reports.
 router.post('/trigger-orchestration', async (req, res) => {
     try {
-        if (!brainBridge.isConnected) {
+        const connected = await waitForConnection(5000);
+        if (!connected) {
+            const status = brainBridge.status();
             return res.status(503).json({
                 error: 'Brain is not connected. Please ensure the Python Brain server is running.',
+                hint: `Node.js tried to connect to ${status.brainUrl} — reconnect attempt #${status.reconnectAttempts}`,
                 connected: false,
             });
         }
@@ -47,10 +73,13 @@ router.post('/trigger-orchestration', async (req, res) => {
 // Check if OpenAI or Ollama is configured and reachable in Brain.
 router.get('/check-ai', async (req, res) => {
     try {
-        if (!brainBridge.isConnected) {
+        const connected = await waitForConnection(5000);
+        if (!connected) {
+            const status = brainBridge.status();
             return res.status(503).json({
                 available: false,
-                error: 'Brain is not connected',
+                error: 'Brain is not connected. Please ensure the Python Brain server is running.',
+                hint: `Node.js tried to connect to ${status.brainUrl} — reconnect attempt #${status.reconnectAttempts}`,
                 connected: false,
             });
         }
@@ -71,9 +100,12 @@ router.post('/generate-prompt', async (req, res) => {
         if (!url) {
             return res.status(400).json({ error: 'url is required' });
         }
-        if (!brainBridge.isConnected) {
+        const connected = await waitForConnection(5000);
+        if (!connected) {
+            const status = brainBridge.status();
             return res.status(503).json({
                 error: 'Brain is not connected',
+                hint: `Node.js tried to connect to ${status.brainUrl} — reconnect attempt #${status.reconnectAttempts}`,
                 connected: false,
             });
         }
