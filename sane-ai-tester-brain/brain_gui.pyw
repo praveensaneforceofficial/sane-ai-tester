@@ -2,7 +2,7 @@ import os
 import sys
 import shutil
 import tkinter as tk
-from tkinter import messagebox, scrolledtext
+from tkinter import messagebox, scrolledtext, filedialog
 import subprocess
 import threading
 import time
@@ -55,7 +55,7 @@ class BrainGUIApp:
     def __init__(self, root):
         self.root = root
         self.root.title("Sane-AI Brain Engine Control Panel")
-        self.root.geometry("700x520")
+        self.root.geometry("700x600")
         self.root.configure(bg="#0f172a") # Slate 900
         self.root.resizable(True, True)
 
@@ -64,9 +64,14 @@ class BrainGUIApp:
         self.status_thread = None
         self.running = False
         self.closing = False
+        self.project_dir = None
+        self.browse_btn = None
 
         # Apply custom style configuration
         self.setup_ui()
+
+        # Auto-find project folder or ask user
+        self.root.after(100, self.auto_find_project)
 
         # Start health check loop in the background
         self.start_health_check_loop()
@@ -95,12 +100,12 @@ class BrainGUIApp:
         subtitle_label.pack(anchor=tk.W, padx=20)
 
         # Status and Controls frame
-        control_frame = tk.Frame(self.root, bg="#1e293b", bd=1, relief=tk.FLAT, pady=15, padx=20)
-        control_frame.pack(fill=tk.X, padx=20, pady=5)
+        self.control_frame = tk.Frame(self.root, bg="#1e293b", bd=1, relief=tk.FLAT, pady=15, padx=20)
+        self.control_frame.pack(fill=tk.X, padx=20, pady=5)
 
         # Status indicator
         self.status_label = tk.Label(
-            control_frame, 
+            self.control_frame, 
             text="STATUS: STOPPED", 
             font=("Segoe UI", 11, "bold"), 
             fg="#ef4444", 
@@ -109,17 +114,27 @@ class BrainGUIApp:
         self.status_label.pack(side=tk.LEFT)
 
         self.info_label = tk.Label(
-            control_frame, 
-            text="|  Host: " + BRAIN_HOST, 
+            self.control_frame, 
+            text=f"|  Host: {BRAIN_HOST} | Port: {BRAIN_PORT}", 
             font=("Segoe UI", 10), 
             fg="#cbd5e1", 
             bg="#1e293b"
         )
         self.info_label.pack(side=tk.LEFT, padx=10)
 
+        # Project folder label
+        self.project_label = tk.Label(
+            self.control_frame,
+            text="📁 Project: Not selected",
+            font=("Segoe UI", 9),
+            fg="#fbbf24",
+            bg="#1e293b"
+        )
+        self.project_label.pack(side=tk.LEFT, padx=10)
+
         # Controls Buttons
         self.stop_btn = tk.Button(
-            control_frame, 
+            self.control_frame, 
             text="Stop Server", 
             font=("Segoe UI", 10, "bold"), 
             bg="#ef4444", 
@@ -136,7 +151,7 @@ class BrainGUIApp:
         self.stop_btn.pack(side=tk.RIGHT, padx=5)
 
         self.start_btn = tk.Button(
-            control_frame, 
+            self.control_frame, 
             text="Start Server", 
             font=("Segoe UI", 10, "bold"), 
             bg="#10b981", 
@@ -147,9 +162,26 @@ class BrainGUIApp:
             padx=15, 
             pady=6, 
             cursor="hand2",
+            state=tk.DISABLED,
             command=self.start_server
         )
         self.start_btn.pack(side=tk.RIGHT, padx=5)
+
+        self.browse_btn = tk.Button(
+            self.control_frame,
+            text="📁 Select Project",
+            font=("Segoe UI", 10, "bold"),
+            bg="#3b82f6",
+            fg="white",
+            activebackground="#2563eb",
+            activeforeground="white",
+            bd=0,
+            padx=15,
+            pady=6,
+            cursor="hand2",
+            command=self.select_project_folder
+        )
+        self.browse_btn.pack(side=tk.RIGHT, padx=5)
 
         # Log label
         log_label_frame = tk.Frame(self.root, bg="#0f172a", pady=5)
@@ -180,6 +212,77 @@ class BrainGUIApp:
         # Handle window exit safely
         self.root.protocol("WM_DELETE_WINDOW", self.on_close)
 
+    def auto_find_project(self):
+        """Try to automatically find the project folder"""
+        self.write_log("🔍 Looking for Sane-AI-Brain project folder...\n")
+        
+        # List of possible locations to check
+        possible_paths = []
+        
+        # Check if running as exe
+        if getattr(sys, 'frozen', False):
+            # Same directory as the exe
+            exe_dir = os.path.dirname(sys.executable)
+            possible_paths.append(exe_dir)
+            
+            # Parent directory of exe
+            possible_paths.append(os.path.dirname(exe_dir))
+            
+            # Desktop
+            desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+            possible_paths.append(desktop)
+            possible_paths.append(os.path.join(desktop, "SANE-AI-TESTER"))
+            possible_paths.append(os.path.join(desktop, "sane-ai-tester-brain"))
+            
+            # Documents
+            docs = os.path.join(os.path.expanduser("~"), "Documents")
+            possible_paths.append(docs)
+            possible_paths.append(os.path.join(docs, "SANE-AI-TESTER"))
+        else:
+            # Running as script - check current and parent directories
+            possible_paths.append(script_dir)
+            possible_paths.append(os.path.dirname(script_dir))
+            possible_paths.append(os.path.dirname(os.path.dirname(script_dir)))
+        
+        # Check all possible paths
+        for path in possible_paths:
+            if path and os.path.exists(os.path.join(path, "src", "main.py")):
+                self.project_dir = path
+                self.project_label.configure(text=f"📁 Project: {os.path.basename(path)}")
+                self.write_log(f"✅ Auto-detected project folder: {path}\n")
+                self.start_btn.configure(state=tk.NORMAL, bg="#10b981")
+                self.browse_btn.configure(text="📁 Change Project")
+                return
+        
+        # If not found, ask user to select
+        self.write_log("⚠️ Could not auto-detect project folder!\n")
+        self.write_log("Please click 'Select Project' button to choose your Sane-AI-Brain folder.\n")
+        self.write_log("The folder should contain 'src/main.py'\n")
+        
+    def select_project_folder(self):
+        """Let user select the folder containing src/main.py"""
+        initial_dir = self.project_dir if self.project_dir else os.path.expanduser("~")
+        
+        folder = filedialog.askdirectory(
+            title="Select your Sane-AI-Brain project folder (contains src/main.py)",
+            initialdir=initial_dir
+        )
+        
+        if folder:
+            # Check if src/main.py exists
+            if os.path.exists(os.path.join(folder, "src", "main.py")):
+                self.project_dir = folder
+                self.project_label.configure(text=f"📁 Project: {os.path.basename(folder)}")
+                self.write_log(f"✅ Project folder set to: {folder}\n")
+                self.start_btn.configure(state=tk.NORMAL, bg="#10b981")
+                self.browse_btn.configure(text="📁 Change Project")
+                return True
+            else:
+                self.write_log(f"❌ Invalid folder! Could not find 'src/main.py' in: {folder}\n")
+                self.write_log("Please select the correct project folder that contains the 'src' directory.\n")
+                return False
+        return False
+
     def write_log(self, text):
         if self.closing:
             return
@@ -191,6 +294,19 @@ class BrainGUIApp:
     def start_server(self):
         if self.running:
             return
+        
+        # Check if project directory is selected
+        if not self.project_dir:
+            self.write_log("⚠️ Please select your project folder first!\n")
+            self.select_project_folder()
+            return
+        
+        # Verify project directory still valid
+        if not os.path.exists(os.path.join(self.project_dir, "src", "main.py")):
+            self.write_log("❌ Project folder is invalid! Please reselect.\n")
+            self.project_dir = None
+            self.select_project_folder()
+            return
 
         self.running = True
         self.start_btn.configure(state=tk.DISABLED, bg="#6b7280")
@@ -201,13 +317,36 @@ class BrainGUIApp:
         # Run uvicorn in subprocess, no console window
         try:
             python_exe = get_python_executable()
+            
+            # Set PYTHONPATH to include project directory
+            env = os.environ.copy()
+            pythonpath = env.get('PYTHONPATH', '')
+            if pythonpath:
+                pythonpath = self.project_dir + os.pathsep + pythonpath
+            else:
+                pythonpath = self.project_dir
+            env['PYTHONPATH'] = pythonpath
+            
             cmd = [
                 python_exe, "-m", "uvicorn",
                 "src.main:app",
                 "--host", BRAIN_HOST,
                 "--port", str(BRAIN_PORT)
             ]
+            
             self.write_log(f">>> Executing command: {' '.join(cmd)}\n")
+            self.write_log(f">>> Working directory: {self.project_dir}\n")
+            
+            # Verify src/main.py exists
+            src_main_path = os.path.join(self.project_dir, "src", "main.py")
+            if not os.path.exists(src_main_path):
+                self.write_log(f"❌ ERROR: Cannot find {src_main_path}\n")
+                self.write_log("Please check that src/main.py exists in the selected folder\n")
+                self.running = False
+                self.start_btn.configure(state=tk.NORMAL, bg="#10b981")
+                self.stop_btn.configure(state=tk.DISABLED)
+                self.status_label.configure(text="STATUS: FAILED - Missing src/main.py", fg="#ef4444")
+                return
             
             # Use CREATE_NO_WINDOW on Windows to prevent a black CMD box popping up
             creation_flags = 0
@@ -221,7 +360,8 @@ class BrainGUIApp:
                 text=True,
                 encoding='utf-8',
                 errors='ignore',
-                cwd=script_dir,
+                cwd=self.project_dir,
+                env=env,
                 creationflags=creation_flags
             )
 
@@ -267,10 +407,12 @@ class BrainGUIApp:
                 if sys.platform == 'win32':
                     subprocess.run(
                         ["taskkill", "/F", "/T", "/PID", str(self.server_process.pid)],
+                        capture_output=True,
                         creationflags=subprocess.CREATE_NO_WINDOW
                     )
                 else:
                     self.server_process.terminate()
+                    self.server_process.wait(timeout=5)
             except Exception as e:
                 self.write_log(f"⚠️ Error while terminating process: {str(e)}\n")
 
@@ -314,8 +456,4 @@ class BrainGUIApp:
 if __name__ == "__main__":
     root = tk.Tk()
     app = BrainGUIApp(root)
-    
-    # Automatically start the server on GUI open as requested
-    root.after(500, app.start_server)
-    
     root.mainloop()
