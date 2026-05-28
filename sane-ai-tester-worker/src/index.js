@@ -60,6 +60,24 @@ async function fetchAndExecutePendingTasks(workerId) {
     }
 }
 
+async function checkBrainAndConnect() {
+    logger.info("🧠 Waiting for Brain AI to be connected to the API WebSocket...");
+    while (true) {
+        try {
+            const response = await axios.get(`${config.API_URL}/api/brain/status`, { timeout: 3000 });
+            if (response.data && response.data.connected) {
+                logger.info("✅ Brain AI is connected! Establishing WebSocket connection...");
+                socketClient.connect();
+                break;
+            }
+        } catch (err) {
+            // ignore error
+        }
+        logger.info("⏳ Brain AI offline/unreachable. Retrying in 5 seconds...");
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+}
+
 async function startWorker() {
     console.clear();
     console.log("=========================================");
@@ -117,8 +135,26 @@ async function startWorker() {
         }
     });
 
-    // Start Socket connection
-    socketClient.connect();
+    socketClient.on('onTaskCancel', async (data) => {
+        logger.info(`📥 CANCEL TASK RECEIVED for: ${data.taskId}`);
+        if (agent && agent.currentTask && (agent.currentTask.taskId || agent.currentTask.id) === data.taskId) {
+            logger.info(`🛑 Aborting task ${data.taskId}...`);
+            await agent.cleanup();
+            // Re-initialize agent/playwright runner to be ready for next task
+            await agent.start();
+        }
+    });
+
+    socketClient.on('onDisconnect', async (reason) => {
+        logger.warn(`🔌 Disconnected from central server: ${reason}`);
+        if (agent && agent.isRunning) {
+            logger.info("⚠️ Disconnection detected. Aborting active browser/tasks...");
+            await agent.cleanup();
+        }
+    });
+
+    // Start Socket connection check and connect
+    await checkBrainAndConnect();
 }
 
 async function setStatus(status) {

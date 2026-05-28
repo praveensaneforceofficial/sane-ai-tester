@@ -20,11 +20,28 @@ class APIWebSocketClient:
         async def connect():
             logger.info("✅ Connected to API Bridge WebSocket")
             self.is_connected = True
+            try:
+                await self.sio.emit('brain:register', {})
+                logger.info("🧠 Sent brain:register to API")
+            except Exception as e:
+                logger.error(f"Failed to register Brain client: {e}")
         
         @self.sio.event
         async def disconnect():
             logger.warning("⚠️ Disconnected from API Bridge WebSocket")
             self.is_connected = False
+            try:
+                from services.aiOrchestratorService import ai_orchestrator
+                ai_orchestrator.abort_requested = True
+                logger.info("🛑 Abort request set in AI Orchestrator due to disconnect")
+            except Exception as e:
+                pass
+            
+        @self.sio.on('brain:command')
+        async def on_brain_command(data):
+            logger.info(f"🧠 Received brain command via Socket.IO: {data}")
+            import asyncio
+            asyncio.create_task(self._process_brain_command(data))
         
         @self.sio.event
         async def dashboard_update(data=None):
@@ -46,6 +63,76 @@ class APIWebSocketClient:
             logger.info(f"📄 Report generated for task: {data.get('taskId')}")
             await self._handle_event("report:generated", data)
     
+    async def _process_brain_command(self, data: Dict[str, Any]):
+        job_id = data.get("job_id")
+        msg_type = data.get("type")
+        
+        if not msg_type:
+            logger.warning("Received brain command without type")
+            await self.sio.emit('brain:response', {
+                "job_id": job_id,
+                "type": "error",
+                "error": "Missing message type"
+            })
+            return
+            
+        logger.info(f"🧠 Processing command: {msg_type} (Job ID: {job_id})")
+        
+        try:
+            from services.aiOrchestratorService import ai_orchestrator
+            
+            if msg_type == "orchestrate":
+                result = await ai_orchestrator.run_brain_agent_orchestration()
+                await self.sio.emit('brain:response', {
+                    "job_id": job_id,
+                    "type": "result",
+                    "data": result
+                })
+                
+            elif msg_type == "check-ai":
+                result = await ai_orchestrator.check_ai_availability()
+                await self.sio.emit('brain:response', {
+                    "job_id": job_id,
+                    "type": "result",
+                    "data": result
+                })
+                
+            elif msg_type == "generate-prompt":
+                url = data.get("url")
+                if not url:
+                    raise ValueError("url is required for generate-prompt")
+                prompt = await ai_orchestrator.generate_test_prompt(url)
+                await self.sio.emit('brain:response', {
+                    "job_id": job_id,
+                    "type": "result",
+                    "data": {"prompt": prompt}
+                })
+                
+            elif msg_type in ("stop", "cancel"):
+                ai_orchestrator.abort_requested = True
+                logger.info("🛑 Abort request set in AI Orchestrator via Socket.IO command")
+                await self.sio.emit('brain:response', {
+                    "job_id": job_id,
+                    "type": "result",
+                    "data": {"status": "stopping"}
+                })
+                
+            else:
+                logger.warning(f"Unknown command type: {msg_type}")
+                await self.sio.emit('brain:response', {
+                    "job_id": job_id,
+                    "type": "error",
+                    "error": f"Unknown command type: {msg_type}"
+                })
+                
+        except Exception as e:
+            logger.error(f"Error executing command {msg_type} ({job_id}): {e}", exc_info=True)
+            await self.sio.emit('brain:response', {
+                "job_id": job_id,
+                "type": "error",
+                "error": str(e)
+            })
+
     async def _handle_event(self, event: str, data: Dict):
         """Handle incoming events"""
         if hasattr(self, 'event_callback'):

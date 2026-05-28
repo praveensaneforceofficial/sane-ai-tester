@@ -38,6 +38,10 @@ class SocketClient {
             if (this.callbacks.onTaskAssign) this.callbacks.onTaskAssign(task);
         });
 
+        this.socket.on('task:cancel', (data) => {
+            if (this.callbacks.onTaskCancel) this.callbacks.onTaskCancel(data);
+        });
+
         this.socket.on('disconnect', (reason) => {
             logger.warn(`🔌 Disconnected from socket server: ${reason}`);
             if (this.callbacks.onDisconnect) this.callbacks.onDisconnect(reason);

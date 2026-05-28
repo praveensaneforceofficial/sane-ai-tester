@@ -252,6 +252,7 @@ class BrainGUIApp:
                 self.write_log(f"✅ Auto-detected project folder: {path}\n")
                 self.start_btn.configure(state=tk.NORMAL, bg="#10b981")
                 self.browse_btn.configure(text="📁 Change Project")
+                self.start_server()
                 return
         
         # If not found, ask user to select
@@ -318,14 +319,17 @@ class BrainGUIApp:
         try:
             python_exe = get_python_executable()
             
-            # Set PYTHONPATH to include project directory
+            # Set PYTHONPATH to include project directory and src subdirectory
             env = os.environ.copy()
+            src_dir = os.path.join(self.project_dir, 'src')
             pythonpath = env.get('PYTHONPATH', '')
             if pythonpath:
-                pythonpath = self.project_dir + os.pathsep + pythonpath
+                pythonpath = self.project_dir + os.pathsep + src_dir + os.pathsep + pythonpath
             else:
-                pythonpath = self.project_dir
+                pythonpath = self.project_dir + os.pathsep + src_dir
             env['PYTHONPATH'] = pythonpath
+            env['PYTHONUTF8'] = '1'
+            env['PYTHONIOENCODING'] = 'utf-8'
             
             cmd = [
                 python_exe, "-m", "uvicorn",
@@ -429,6 +433,7 @@ class BrainGUIApp:
         self.status_thread.start()
 
     def health_check_loop(self):
+        logged_waiting = False
         while not self.closing:
             if self.running:
                 # Check if port is open
@@ -437,13 +442,20 @@ class BrainGUIApp:
                 try:
                     result = sock.connect_ex((BRAIN_HOST if BRAIN_HOST != '0.0.0.0' else '127.0.0.1', BRAIN_PORT))
                     if result == 0:
-                        self.root.after(0, lambda: self.status_label.configure(text="STATUS: RUNNING & HEALTHY", fg="#10b981"))
+                        self.root.after(0, lambda: self.status_label.configure(text="STATUS: WAITING FOR COMMAND...", fg="#10b981"))
+                        if not logged_waiting:
+                            self.write_log("\n🧠 Sane-AI Brain: Waiting for command...\n")
+                            logged_waiting = True
                     else:
                         self.root.after(0, lambda: self.status_label.configure(text="STATUS: STARTING (Port closed)", fg="#eab308"))
+                        logged_waiting = False
                 except Exception:
                     self.root.after(0, lambda: self.status_label.configure(text="STATUS: UNREACHABLE", fg="#ef4444"))
+                    logged_waiting = False
                 finally:
                     sock.close()
+            else:
+                logged_waiting = False
             time.sleep(2.5)
 
     def on_close(self):

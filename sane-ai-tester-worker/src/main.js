@@ -185,10 +185,39 @@ function updateTaskStatus(message) {
     }
 }
 
+const axios = require('axios');
+
+async function checkBrainAndConnect() {
+    if (mainWindow) {
+        mainWindow.webContents.executeJavaScript(`
+            document.getElementById('status').className = 'status offline';
+            document.getElementById('status').innerHTML = '🟡 Waiting for Brain AI...';
+        `);
+    }
+    while (true) {
+        try {
+            const response = await axios.get(`${API_URL}/api/brain/status`, { timeout: 3000 });
+            if (response.data && response.data.connected) {
+                if (mainWindow) {
+                    mainWindow.webContents.executeJavaScript(`
+                        document.getElementById('status').className = 'status online';
+                        document.getElementById('status').innerHTML = '🟢 Connecting...';
+                    `);
+                }
+                connectToServer();
+                break;
+            }
+        } catch (err) {
+            // ignore error
+        }
+        await new Promise(resolve => setTimeout(resolve, 5000));
+    }
+}
+
 app.whenReady().then(() => {
     createWindow();
     createTray();
-    connectToServer();
+    checkBrainAndConnect();
 });
 
 app.on('window-all-closed', () => {

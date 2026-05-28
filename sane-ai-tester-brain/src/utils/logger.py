@@ -16,6 +16,10 @@ def get_logger(name):
         )
         
         # Console Handler
+        try:
+            sys.stdout.reconfigure(encoding='utf-8')
+        except AttributeError:
+            pass # Python < 3.7
         console_handler = logging.StreamHandler(sys.stdout)
         console_handler.setFormatter(formatter)
         logger.addHandler(console_handler)
@@ -26,7 +30,8 @@ def get_logger(name):
             file_handler = RotatingFileHandler(
                 settings.LOG_FILE, 
                 maxBytes=settings.LOG_MAX_SIZE, 
-                backupCount=settings.LOG_BACKUP_COUNT
+                backupCount=settings.LOG_BACKUP_COUNT,
+                encoding='utf-8'
             )
             file_handler.setFormatter(formatter)
             logger.addHandler(file_handler)

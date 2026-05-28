@@ -70,6 +70,15 @@ async def websocket_endpoint(websocket: WebSocket):
                         "data": {"prompt": prompt}
                     })
 
+                elif msg_type in ("stop", "cancel"):
+                    ai_orchestrator.abort_requested = True
+                    logger.info("🛑 Abort request set in AI Orchestrator via WebSocket command")
+                    await websocket.send_json({
+                        "job_id": job_id,
+                        "type": "result",
+                        "data": {"status": "stopping"}
+                    })
+
                 else:
                     logger.warn(f"Unknown message type: {msg_type}")
                     await websocket.send_json({
@@ -88,5 +97,7 @@ async def websocket_endpoint(websocket: WebSocket):
 
     except WebSocketDisconnect:
         logger.info("🔌 Node.js API client disconnected from Brain WebSocket Bridge")
+        ai_orchestrator.abort_requested = True
     except Exception as e:
         logger.error(f"WebSocket bridge error: {e}", exc_info=True)
+        ai_orchestrator.abort_requested = True

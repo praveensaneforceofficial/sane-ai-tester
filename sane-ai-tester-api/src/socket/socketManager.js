@@ -1,6 +1,7 @@
 const workerService = require('../services/workerService');
 const taskService = require('../services/taskService');
 const reportService = require('../services/reportService');
+const brainBridge = require('../services/brainWebSocketBridge');
 
 class SocketManager {
     constructor(io) {
@@ -15,6 +16,17 @@ class SocketManager {
     }
 
     setupEventHandlers(socket) {
+        // Brain Registration & Communication
+        socket.on('brain:register', () => {
+            console.log(`🧠 Registering Brain client: ${socket.id}`);
+            socket.isBrain = true;
+            brainBridge.setBrainSocket(socket);
+        });
+
+        socket.on('brain:response', (data) => {
+            brainBridge.handleBrainResponse(data);
+        });
+
         // 1. Worker Registration
         socket.on('worker:register', async (data) => {
             const { machineId, nickname, ip, os } = data;
@@ -134,6 +146,10 @@ class SocketManager {
         // 7. Disconnect
         socket.on('disconnect', async () => {
             console.log('🔴 User disconnected:', socket.id);
+            if (socket.isBrain) {
+                console.log(`🔌 Brain disconnected: ${socket.id}`);
+                brainBridge.clearBrainSocket(socket);
+            }
             if (socket.workerId) {
                 console.log(`🔌 Worker disconnected: ${socket.workerId}. Marking offline...`);
                 try {

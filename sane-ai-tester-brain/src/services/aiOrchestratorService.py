@@ -11,6 +11,9 @@ logger = get_logger(__name__)
 class AIOrchestratorService:
     """Orchestrate AI operations using chat_completion standard"""
     
+    def __init__(self):
+        self.abort_requested = False
+        
     async def generate_test_prompt(self, url: str) -> str:
         """Generate test prompt using AI"""
         try:
@@ -114,6 +117,7 @@ class AIOrchestratorService:
         import re
         from services.apiBridgeService import api_bridge_service
 
+        self.abort_requested = False
         logger.info("Starting Brain Agent Orchestration...")
         summary_results = {
             "processed_todo": 0,
@@ -142,6 +146,9 @@ class AIOrchestratorService:
         todo_tasks = [t for t in all_custom_tasks if t.get('status', '').lower() in ('todo', 'pending')]
 
         for task in todo_tasks:
+            if self.abort_requested:
+                logger.warning("Orchestration aborted during Phase 1")
+                break
             summary_results["processed_todo"] += 1
             task_id = task.get('custom_task_id')
             title = task.get('title')
@@ -219,6 +226,9 @@ class AIOrchestratorService:
         ready_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Test Case Ready']
         
         for task in ready_tasks:
+            if self.abort_requested:
+                logger.warning("Orchestration aborted during Phase 2")
+                break
             task_id = task.get('custom_task_id')
             title = task.get('title')
             description = task.get('description', '')
@@ -287,6 +297,9 @@ class AIOrchestratorService:
         available_workers = [w for w in workers if w.get('status') == 'online']
         
         for task in testing_tasks:
+            if self.abort_requested:
+                logger.warning("Orchestration aborted during Phase 3")
+                break
             # Check if task is already assigned to a runner
             node_task_id = task.get('task_id')
             if node_task_id:
@@ -382,6 +395,9 @@ class AIOrchestratorService:
         active_testing_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Testing Going']
         
         for task in active_testing_tasks:
+            if self.abort_requested:
+                logger.warning("Orchestration aborted during Phase 4")
+                break
             task_id = task.get('custom_task_id')
             title = task.get('title')
             node_task_id = task.get('task_id')
@@ -438,6 +454,9 @@ class AIOrchestratorService:
         report_tasks = [t for t in all_custom_tasks if t.get('status', '') == 'Report Generation']
         
         for task in report_tasks:
+            if self.abort_requested:
+                logger.warning("Orchestration aborted during Phase 5")
+                break
             task_id = task.get('custom_task_id')
             title = task.get('title')
             description = task.get('description', '')

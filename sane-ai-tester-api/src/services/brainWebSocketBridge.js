@@ -33,109 +33,34 @@ class BrainWebSocketBridge extends EventEmitter {
 
     /**
      * Initialize the bridge and store Socket.IO reference.
-     * Call this once from server.js after io is created.
      */
     async initialize(io) {
         this.io = io;
-        console.log(`🧠 BrainBridge: Initializing connection to ${this.brainUrl}`);
-        this._connect();
+        console.log(`🧠 BrainBridge: Initialized. Waiting for Brain client via Socket.IO`);
+        this.isConnected = false;
     }
 
-    // ─── Internal WebSocket lifecycle ─────────────────────────
-
-    _connect() {
-        // Lazy-require 'ws' — bundled with most Node environments
-        let WebSocket;
-        try {
-            WebSocket = require('ws');
-        } catch (_) {
-            console.error('❌ BrainBridge: "ws" package not installed. Run: npm install ws');
-            return;
+    setBrainSocket(socket) {
+        this.ws = socket;
+        this.isConnected = true;
+        console.log(`✅ BrainBridge: Brain socket registered (${socket.id})`);
+        if (this.io) {
+            this.io.emit('brain:status', { connected: true });
         }
+    }
 
-        try {
-            this.ws = new WebSocket(this.brainUrl);
-        } catch (err) {
-            console.error('❌ BrainBridge: Failed to create WebSocket:', err.message);
-            this._scheduleReconnect();
-            return;
-        }
-
-        this.ws.on('open', () => {
-            this.isConnected = true;
-            this.reconnectAttempts = 0;
-            this.reconnectDelay = 3000;
-            console.log('✅ BrainBridge: Connected to Python Brain');
-            this._startPing();
-            if (this.io) {
-                this.io.emit('brain:status', { connected: true });
-            }
-        });
-
-        this.ws.on('message', (raw) => {
-            this._handleMessage(raw);
-        });
-
-        this.ws.on('close', (code, reason) => {
+    clearBrainSocket(socket) {
+        if (this.ws === socket) {
+            this.ws = null;
             this.isConnected = false;
-            this._stopPing();
-            console.warn(`⚠️  BrainBridge: Connection closed (${code}). Reconnecting…`);
+            console.log(`❌ BrainBridge: Brain socket disconnected`);
             if (this.io) {
                 this.io.emit('brain:status', { connected: false });
             }
-            this._scheduleReconnect();
-        });
-
-        this.ws.on('error', (err) => {
-            // 'close' will fire after 'error', so just log here
-            console.error('❌ BrainBridge: WebSocket error:', err.message);
-        });
-    }
-
-    _scheduleReconnect() {
-        if (this._reconnectTimer) return; // already scheduled
-        if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-            console.error('❌ BrainBridge: Max reconnect attempts reached. Giving up.');
-            return;
-        }
-        this.reconnectAttempts++;
-        const delay = Math.min(
-            this.reconnectDelay * Math.pow(1.5, this.reconnectAttempts - 1),
-            this.maxReconnectDelay
-        );
-        console.log(`🔄 BrainBridge: Reconnect attempt ${this.reconnectAttempts} in ${Math.round(delay / 1000)}s`);
-        this._reconnectTimer = setTimeout(() => {
-            this._reconnectTimer = null;
-            this._connect();
-        }, delay);
-    }
-
-    _startPing() {
-        this._pingInterval = setInterval(() => {
-            if (this.ws && this.ws.readyState === 1 /* OPEN */) {
-                this.ws.ping?.();
-            }
-        }, 30000);
-    }
-
-    _stopPing() {
-        if (this._pingInterval) {
-            clearInterval(this._pingInterval);
-            this._pingInterval = null;
         }
     }
 
-    // ─── Message handling ──────────────────────────────────────
-
-    _handleMessage(raw) {
-        let msg;
-        try {
-            msg = JSON.parse(raw.toString());
-        } catch (_) {
-            console.warn('⚠️  BrainBridge: Received non-JSON message');
-            return;
-        }
-
+    handleBrainResponse(msg) {
         const { job_id, type, data, error } = msg;
 
         // Push ALL brain events to the dashboard via Socket.IO
@@ -168,12 +93,11 @@ class BrainWebSocketBridge extends EventEmitter {
      */
     send(type, payload = {}) {
         return new Promise((resolve, reject) => {
-            if (!this.isConnected || !this.ws || this.ws.readyState !== 1) {
-                return reject(new Error('Brain WebSocket is not connected'));
+            if (!this.isConnected || !this.ws) {
+                return reject(new Error('Brain is not connected'));
             }
 
             const job_id = uuidv4();
-            const message = JSON.stringify({ job_id, type, ...payload });
 
             const timeoutHandle = setTimeout(() => {
                 this.pendingJobs.delete(job_id);
@@ -182,13 +106,13 @@ class BrainWebSocketBridge extends EventEmitter {
 
             this.pendingJobs.set(job_id, { resolve, reject, timeout: timeoutHandle });
 
-            this.ws.send(message, (err) => {
-                if (err) {
-                    clearTimeout(timeoutHandle);
-                    this.pendingJobs.delete(job_id);
-                    reject(new Error(`Failed to send to Brain: ${err.message}`));
-                }
-            });
+            try {
+                this.ws.emit('brain:command', { job_id, type, ...payload });
+            } catch (err) {
+                clearTimeout(timeoutHandle);
+                this.pendingJobs.delete(job_id);
+                reject(new Error(`Failed to emit command to Brain: ${err.message}`));
+            }
         });
     }
 
@@ -196,9 +120,9 @@ class BrainWebSocketBridge extends EventEmitter {
     status() {
         return {
             connected: this.isConnected,
-            brainUrl: this.brainUrl,
+            brainUrl: 'inward Socket.IO connection',
             pendingJobs: this.pendingJobs.size,
-            reconnectAttempts: this.reconnectAttempts,
+            reconnectAttempts: 0,
         };
     }
 }
