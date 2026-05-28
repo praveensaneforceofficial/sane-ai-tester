@@ -3,8 +3,11 @@ const path = require('path');
 const { machineIdSync } = require('node-machine-id');
 const io = require('socket.io-client');
 const dotenv = require('dotenv');
+const path = require('path');
 
-dotenv.config();
+// In packaged Electron apps, process.cwd() is NOT the app directory.
+// Resolve .env relative to this file's location (src/) -> parent is project root.
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 let mainWindow;
 let tray = null;

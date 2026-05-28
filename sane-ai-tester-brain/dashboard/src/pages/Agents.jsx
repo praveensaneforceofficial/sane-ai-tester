@@ -1,14 +1,40 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useWorkerStore } from '../store/workerStore'
 import StatusBadge from '../components/Common/StatusBadge'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
 import { Cpu, Server, Wifi, WifiOff, Activity, Clock, Plus, Smartphone, GitFork, LayoutGrid, Trash2, PowerOff } from 'lucide-react'
 import toast from 'react-hot-toast'
+import socketService from '../services/socket'
 
 function Agents() {
   const { workers, loading, updateWorkerStatus, deleteWorker } = useWorkerStore()
   const [selectedAgent, setSelectedAgent] = useState(null)
   const [viewType, setViewType] = useState('tree') // 'tree' or 'board'
+  const [isBrainOnline, setIsBrainOnline] = useState(false)
+
+  useEffect(() => {
+    const fetchBrainStatus = async () => {
+      try {
+        const res = await fetch('/api/brain/status')
+        const data = await res.json()
+        setIsBrainOnline(!!data.connected)
+      } catch (err) {
+        console.error('Failed to get brain status:', err)
+      }
+    }
+
+    fetchBrainStatus()
+
+    const handleBrainStatus = (data) => {
+      setIsBrainOnline(!!data.connected)
+    }
+
+    socketService.on('brain:status', handleBrainStatus)
+
+    return () => {
+      socketService.off('brain:status', handleBrainStatus)
+    }
+  }, [])
 
   const getAgentTheme = (nickname = '', type = '', status = 'offline') => {
     const nameLower = (nickname || '').toLowerCase()
@@ -118,15 +144,26 @@ function Agents() {
           <div className="flex flex-col items-center w-full py-10 bg-white border border-slate-200/60 rounded-3xl shadow-sm relative overflow-hidden">
             {/* Master Node */}
             <div className="flex flex-col items-center relative z-10 mb-2">
-              <div className="w-16 h-16 bg-slate-900 rounded-full flex items-center justify-center shadow-xl shadow-indigo-500/20 ring-4 ring-indigo-50/50 mb-3 relative animate-pulse-slow">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center shadow-xl ring-4 ring-indigo-50/50 mb-3 relative transition-all duration-300 ${
+                isBrainOnline
+                  ? 'bg-slate-900 shadow-indigo-500/20 animate-pulse-slow'
+                  : 'bg-slate-400 shadow-slate-400/20'
+              }`}>
                 <Server className="w-7 h-7 text-white" />
               </div>
               <div className="text-center">
                 <h4 className="font-extrabold text-slate-800 text-sm">AI Agent Master</h4>
                 <span className="text-[10px] font-mono text-slate-400">127.0.0.1</span>
-                <div className="mt-1.5">
+                <div className="mt-1.5 flex flex-col items-center gap-1.5">
                   <span className="px-2.5 py-0.5 bg-indigo-50 text-indigo-600 border border-indigo-100 rounded-full text-[9px] font-extrabold uppercase tracking-wider">
                     Master
+                  </span>
+                  <span className={`px-2 py-0.5 text-[8px] font-black uppercase rounded-full border transition-all duration-300 ${
+                    isBrainOnline
+                      ? 'bg-emerald-500 text-white border-emerald-400 shadow-sm shadow-emerald-400/20'
+                      : 'bg-slate-200 text-slate-500 border-slate-200'
+                  }`}>
+                    {isBrainOnline ? 'ONLINE' : 'OFFLINE'}
                   </span>
                 </div>
               </div>

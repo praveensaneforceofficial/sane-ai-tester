@@ -2,9 +2,10 @@ const { machineIdSync } = require('node-machine-id');
 const prompts = require('prompts');
 const dotenv = require('dotenv');
 const axios = require('axios');
+const path = require('path');
 
-// Load environment configurations
-dotenv.config();
+// Resolve .env relative to this file's location (src/) -> parent is project root.
+dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
 
 const socketClient = require('./network/socketClient');
 const heartbeat = require('./network/heartbeat');

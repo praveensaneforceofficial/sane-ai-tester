@@ -1,8 +1,8 @@
 const os = require('os');
 const path = require('path');
 
-// Load environment variables
-require('dotenv').config();
+// Load environment variables — resolve .env relative to this file (src/utils/) -> project root
+require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 const config = {
     // API Configuration

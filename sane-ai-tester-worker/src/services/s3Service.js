@@ -3,8 +3,8 @@ const fs = require('fs-extra');
 const path = require('path');
 const logger = require('../utils/logger');
 
-// Load environment variables
-require('dotenv').config();
+// Load environment variables — resolve .env relative to this file (src/services/) -> project root
+require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 class S3Service {
     constructor() {

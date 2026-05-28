@@ -138,11 +138,18 @@ function SprintBoard() {
         fetchCustomTasks()
       }
     } catch (err) {
-      const errTxt = `Failed to trigger Brain Agent: ${err.message}`
+      const serverMsg = err.response?.data?.error || err.message;
+      const isOffline = serverMsg.includes('not connected') || serverMsg.toLowerCase().includes('offline') || err.message?.includes('503');
+      const errTxt = isOffline ? 'Brain is offline' : `Failed to trigger Brain Agent: ${serverMsg}`;
+      
       if (!silent) {
         toast.error(errTxt, { id: loadToast })
       } else {
         toast.error(errTxt)
+      }
+      
+      if (isOffline) {
+        stopBrainAgentLoop()
       }
     } finally {
       if (!silent) setLoadingBrainAgent(false)
