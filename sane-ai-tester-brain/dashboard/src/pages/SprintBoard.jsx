@@ -736,11 +736,13 @@ function SprintBoard() {
                     onClick={() => handleOpenTaskDetails(task)}
                     className="bg-white p-3 rounded-xl shadow-sm border border-slate-200/80 cursor-pointer hover:shadow-md hover:border-slate-300 transition-all duration-200 relative group"
                   >
-                    <div className="flex items-start justify-between mb-2">
-                      <span className="text-[9px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md">
+                    <div className="flex items-center justify-between mb-2 gap-2 overflow-hidden">
+                      <span className="text-[9px] font-bold font-mono text-indigo-600 bg-indigo-50 px-1.5 py-0.5 rounded-md truncate whitespace-nowrap min-w-0">
                         {task.id}
                       </span>
-                      <StatusBadge status={task.status} size="xs" />
+                      <div className="flex-shrink-0">
+                        <StatusBadge status={task.status} size="xs" />
+                      </div>
                     </div>
                     <h4 className="font-bold text-slate-800 text-[12.5px] mb-2 line-clamp-2 leading-relaxed">
                       {task.name || task.prompt?.substring(0, 50)}

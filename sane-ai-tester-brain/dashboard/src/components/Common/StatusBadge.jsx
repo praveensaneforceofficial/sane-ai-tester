@@ -19,7 +19,14 @@ const statusConfig = {
 
 function StatusBadge({ status, size = 'sm' }) {
   const config = statusConfig[status?.toLowerCase()] || { label: status, className: 'bg-gray-100 text-gray-800 border border-gray-200' }
-  const sizeClass = size === 'sm' ? 'px-2 py-0.5 text-xs' : 'px-3 py-1 text-sm'
+  
+  let sizeClass = 'px-3 py-1 text-sm whitespace-nowrap'
+  if (size === 'xs') {
+    sizeClass = 'px-1.5 py-0.5 text-[9px] whitespace-nowrap'
+  } else if (size === 'sm') {
+    sizeClass = 'px-2 py-0.5 text-xs whitespace-nowrap'
+  }
+
   const isPulse = status?.toLowerCase() === 'online' || status?.toLowerCase() === 'testing going';
   
   return (
