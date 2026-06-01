@@ -156,12 +156,15 @@ function SprintBoard() {
     }
   }
 
-  const startBrainAgentLoop = () => {
+  const startBrainAgentLoop = (silent = false) => {
     setIsBrainAgentActive(true)
-    toast.success('🤖 Sane AI Agent Daemon started! Operating continuously.')
+    localStorage.setItem('brainDaemonActive', 'true')
+    if (!silent) {
+      toast.success('🤖 Sane AI Agent Daemon started! Operating continuously.')
+    }
     
     // Run the first check immediately
-    executeOrchestrationRun(false)
+    executeOrchestrationRun(silent)
 
     // Set up repeating interval (every 8 seconds)
     brainAgentIntervalRef.current = setInterval(() => {
@@ -175,6 +178,7 @@ function SprintBoard() {
       brainAgentIntervalRef.current = null
     }
     setIsBrainAgentActive(false)
+    localStorage.setItem('brainDaemonActive', 'false')
     toast.success('🛑 Sane AI Agent Daemon stopped.')
   }
 
@@ -280,6 +284,13 @@ function SprintBoard() {
     loadZohoProjectsList()
     fetchCustomTasks()
     fetchAllProjects()
+    
+    // Auto-resume Brain Agent if it was running before refresh
+    if (localStorage.getItem('brainDaemonActive') === 'true') {
+      // Small timeout ensures everything is mounted before calling the loop
+      setTimeout(() => startBrainAgentLoop(true), 500)
+    }
+
     return () => {
       if (brainAgentIntervalRef.current) {
         clearInterval(brainAgentIntervalRef.current)

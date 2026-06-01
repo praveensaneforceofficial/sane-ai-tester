@@ -545,7 +545,13 @@ class AIOrchestratorService:
                             pr_num = int(pr_match.group(1).strip())
                             
                             status_str = "Success" if is_success else "Failure"
-                            video_link = report.get('video_path', 'No video available')
+                            
+                            # Extract video link correctly from report or report_data
+                            video_link = report.get('video_path')
+                            if not video_link and isinstance(report.get('report_data'), dict):
+                                video_link = report.get('report_data').get('videoUrl')
+                            if not video_link:
+                                video_link = 'No video available'
                             
                             final_comment = f"Sane AI Tester :\nStatus : {status_str}\n\nVideo Link: {video_link}\n\nSummary:\n{summary_text}"
                             await github_client.post_pr_comment(repo, pr_num, final_comment)

@@ -25,7 +25,6 @@ class Agent {
     async start() {
         this.isRunning = true;
         logger.info(`🚀 Agent ${this.workerId} started`);
-        this.emitStatus('active');
         
         this.playwrightRunner = new PlaywrightRunner({
             headless: config.BROWSER_HEADLESS,
@@ -37,6 +36,7 @@ class Agent {
         
         await this.playwrightRunner.initialize();
         logger.info("✅ Agent Automation Framework (Playwright) initialized");
+        this.emitStatus('active');
     }
     
     async executeTask(task) {
@@ -77,14 +77,34 @@ class Agent {
                 logger.warn(`⚠️ Could not retrieve live DOM context: ${domErr.message}`);
             }
 
-            // 1. Generate Playwright Script dynamically via AI
-            const scriptCode = await this.aiExecutor.generatePlaywrightScript(instructions, task.url, domContext);
+            // 1 & 2. Generate and Execute with Self-Correction Retry Loop
+            let executionResult;
+            let currentScriptCode = "";
+            let errorContext = "";
+            const MAX_RETRIES = 2; // 1 initial attempt + 2 retries
             
-            // 2. Execute the generated Script directly
-            const executionResult = await this.playwrightRunner.executeDynamicScript(scriptCode, {
-                url: task.url,
-                taskId: task.taskId || task.id
-            });
+            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+                if (attempt > 0) {
+                    logger.info(`🔄 Self-Correction Retry ${attempt}/${MAX_RETRIES} due to error...`);
+                    const retryInstructions = `${instructions}\n\nCRITICAL FIX NEEDED: The previous attempt failed with this error:\n"${errorContext}"\n\nPlease correct the Playwright script to fix this error (e.g., try an alternate selector from the DOM context, add waitForTimeout, or handle the error gracefully).`;
+                    currentScriptCode = await this.aiExecutor.generatePlaywrightScript(retryInstructions, task.url, domContext);
+                } else {
+                    currentScriptCode = await this.aiExecutor.generatePlaywrightScript(instructions, task.url, domContext);
+                }
+                
+                executionResult = await this.playwrightRunner.executeDynamicScript(currentScriptCode, {
+                    url: task.url,
+                    taskId: task.taskId || task.id
+                });
+                
+                if (executionResult.success) {
+                    if (attempt > 0) logger.info(`✅ Self-Correction successful on attempt ${attempt + 1}!`);
+                    break;
+                } else {
+                    errorContext = executionResult.error;
+                    logger.warn(`⚠️ Execution failed on attempt ${attempt + 1}: ${errorContext}`);
+                }
+            }
             
             resultData.status = executionResult.success ? 'completed' : 'failed';
             resultData.data = executionResult.data;
