@@ -5,6 +5,7 @@ from ai.agents.testPlanner import test_planner
 from ai.agents.bugAnalyzer import bug_analyzer
 from config.settings import settings
 from utils.logger import get_logger
+from connectors.github_client import github_client
 
 logger = get_logger(__name__)
 
@@ -531,6 +532,34 @@ class AIOrchestratorService:
                     })
                     summary_results["completed_failed"] += 1
                     summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: {summary_text}")
+                    
+                # Handle Git Trigger PR comments if this task originated from one
+                if "[GIT_TRIGGER_REPO:" in description and "[GIT_TRIGGER_PR:" in description:
+                    try:
+                        import re
+                        repo_match = re.search(r'\[GIT_TRIGGER_REPO: (.*?)\]', description)
+                        pr_match = re.search(r'\[GIT_TRIGGER_PR: (\d+)\]', description)
+                        
+                        if repo_match and pr_match:
+                            repo = repo_match.group(1).strip()
+                            pr_num = int(pr_match.group(1).strip())
+                            
+                            status_str = "Success" if is_success else "Failure"
+                            video_link = report.get('video_path', 'No video available')
+                            
+                            final_comment = f"Sane AI Tester :\nStatus : {status_str}\n\nVideo Link: {video_link}\n\nSummary:\n{summary_text}"
+                            await github_client.post_pr_comment(repo, pr_num, final_comment)
+                            
+                            # Update all associated git_triggers to 'completed'
+                            from connectors.api_bridge.rest_client import api_rest_client
+                            triggers = await api_rest_client.get("/api/tasks/git-triggers")
+                            if triggers:
+                                for t in triggers:
+                                    if t.get('pr_number') == pr_num and t.get('repository') == repo and t.get('status') != 'completed':
+                                        await api_rest_client.put(f"/api/tasks/git-triggers/{t['id']}/status", {"status": "completed"})
+                    except Exception as ge:
+                        logger.error(f"Error handling git trigger completion for custom task {task_id}: {ge}")
+
                     
             except Exception as e:
                 import traceback

@@ -19,6 +19,10 @@ class Settings(BaseSettings):
     ZOHO_ORG_ID: str = ""
     ZOHO_API_BASE: str = "https://www.zohoapis.com/sprint/v1"
     
+    # GitHub Configuration
+    GITHUB_TOKEN: Optional[str] = None
+    GIT_TRIGGER_POLL_INTERVAL: int = 60
+    
     # OpenAI Configuration
     OPENAI_API_KEY: Optional[str] = None
     OPENAI_MODEL: str = "gpt-4o"

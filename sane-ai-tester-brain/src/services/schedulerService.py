@@ -17,6 +17,7 @@ def start_scheduler():
     from scheduler.jobs.task_retrier import retry_failed_tasks
     from scheduler.jobs.analytics_updater import update_analytics
     from scheduler.jobs.orchestrator_job import run_orchestration
+    from scheduler.jobs.git_trigger_poller import poll_git_triggers
     
     # Disable auto polling for Zoho
     # scheduler.add_job(
@@ -56,6 +57,14 @@ def start_scheduler():
         trigger=IntervalTrigger(seconds=60),
         id='ai_orchestration',
         name='Automated AI Orchestration',
+        replace_existing=True
+    )
+    
+    scheduler.add_job(
+        func=poll_git_triggers,
+        trigger=IntervalTrigger(seconds=settings.GIT_TRIGGER_POLL_INTERVAL),
+        id='git_trigger_poller',
+        name='Poll pending Git triggers',
         replace_existing=True
     )
     
