@@ -17,7 +17,6 @@ const menuItems = [
   { id: 'sprint', label: 'Sprint Board', icon: Columns },
   { id: 'agents', label: 'Agents', icon: Bot },
   { id: 'analytics', label: 'Analytics', icon: BarChart3 },
-  { id: 'reports', label: 'Reports', icon: FileText },
 ]
 
 function Sidebar({ activeTab, onTabChange }) {

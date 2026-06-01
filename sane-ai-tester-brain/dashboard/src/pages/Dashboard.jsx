@@ -2,9 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useWorkerStore } from '../store/workerStore'
 import { useAnalyticsStore } from '../store/analyticsStore'
 import KPICards from '../components/Dashboard/KPICards'
-import Charts from '../components/Dashboard/Charts'
 import ActiveThreads from '../components/Dashboard/ActiveThreads'
-import SystemHealth from '../components/Dashboard/SystemHealth'
 import HeroBanner from '../components/Dashboard/HeroBanner'
 import TokenUsageChart from '../components/Dashboard/TokenUsageChart'
 import LoadingSpinner from '../components/Common/LoadingSpinner'
@@ -35,14 +33,6 @@ function Dashboard() {
     <div className="space-y-6 animate-fade-in">
       <HeroBanner />
       <KPICards workers={workers} metrics={metrics} />
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <Charts />
-        </div>
-        <div className="lg:col-span-1">
-          <SystemHealth onlineCount={onlineCount} totalWorkers={totalWorkers} />
-        </div>
-      </div>
 
       {/* Token Usage Section */}
       <div className="card p-6">
