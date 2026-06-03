@@ -30,21 +30,55 @@ AVAILABLE CONTEXT:
 - 'logger' : A logging object with logger.info(), logger.warn(), logger.error().
 
 RULES:
-1. ONLY return the raw JavaScript code to execute the steps. NO markdown formatting, NO \`\`\`javascript blocks, NO explanations.
+1. ONLY return the raw JavaScript code to execute the steps. NO markdown formatting, NO triple backticks, NO explanations.
 2. DO NOT include "const { chromium } = require('playwright')" or browser/context/page initialization.
 3. Use Playwright standard commands: 
    - await page.waitForSelector('selector', { timeout: 10000 })
    - await page.click('selector')
    - await page.fill('selector', 'value')
-   - await page.selectOption('selector', 'value') (Note: selectOption selects option elements)
+   - await page.selectOption('selector', 'value')
    - await page.waitForTimeout(milliseconds)
 4. Add relevant logger.info() statements to document progress.
 5. If you need to click text, use page.locator('text=Your Text').click().
 6. The code must be self-contained and run synchronously.
+7. ROBUSTNESS IS CRITICAL. For interactions, use try-catch blocks with at least 3 fallback strategies. 
+   - Strategy 1: Standard selector (CSS/XPath) using page.click('...', { timeout: 5000 }).
+   - Strategy 2: Text-based locator using page.getByText('...').click({ force: true, timeout: 5000 }).
+   - Strategy 3: X,Y Coordinate Mouse Click. Fetch the bounding box and use mouse.click:
+     const box = await page.locator('...').boundingBox();
+     if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+   CRITICAL WARNING: NEVER use Playwright pseudo-selectors (like :has-text) inside document.querySelector! document.querySelector only supports standard CSS.
+8. Add generous page.waitForTimeout(2000) after logins or navigations before interacting with elements to ensure SPA renders completely.
+9. AMBIGUOUS SELECTIONS: If instructed to "select any division" or similar, DO NOT assume it's a <select> dropdown. It might be a list of radio buttons. Use 'await page.locator(\'input[type="radio"]\').first().click({ force: true })' as a highly effective fallback.
+10. GENERIC BUTTONS: If told to click "Enter" or "Submit", use 'await page.locator(\'text="Enter"\').first().click({ force: true })' or 'page.getByRole(\'button\', { name: /enter/i }).click()'. Do not assume the tag is exactly <button>.
+
+Example Robust Click:
+try {
+    await page.click('select[name="division"]', { timeout: 5000 });
+} catch(e) {
+    logger.warn("Standard click failed, trying text locator");
+    try {
+        await page.getByText('Division', { exact: false }).click({ timeout: 5000, force: true });
+    } catch(e2) {
+        logger.warn("Text click failed, using X,Y coordinate click");
+        const loc = page.locator('select').first();
+        const box = await loc.boundingBox();
+        if (box) {
+            await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+        } else {
+            // Absolute last resort raw JS
+            await page.evaluate(() => { 
+                const el = document.querySelector('select'); 
+                if(el) el.click(); 
+            });
+        }
+    }
+}
 
 Example Output format:
 logger.info("Starting execution");
-await page.waitForSelector('input[name="username"]');
+await page.waitForTimeout(2000);
+await page.waitForSelector('input[name="username"]', { state: 'attached' });
 await page.fill('input[name="username"]', 'admin');
 await page.click('button[type="submit"]');
 logger.info("Finished");

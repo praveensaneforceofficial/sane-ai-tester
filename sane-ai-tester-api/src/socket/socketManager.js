@@ -77,10 +77,18 @@ class SocketManager {
                 await taskService.updateStatus(taskId, 'completed');
                 
                 // Calculate success rate and test counts
-                const total = resultData.actions ? resultData.actions.length : 0;
-                const passed = resultData.actions ? resultData.actions.filter(a => a.success).length : 0;
-                const failed = total - passed;
-                const successRate = total > 0 ? (passed / total) * 100 : 0;
+                let total = resultData.actions ? resultData.actions.length : 0;
+                let passed = resultData.actions ? resultData.actions.filter(a => a.success).length : 0;
+                let failed = total - passed;
+                let successRate = total > 0 ? (passed / total) * 100 : 0;
+                
+                // Fallback for Dynamic Scripts that just return status
+                if (total === 0 && resultData.status) {
+                    total = 1;
+                    passed = resultData.status === 'completed' ? 1 : 0;
+                    failed = total - passed;
+                    successRate = passed * 100;
+                }
                 
                 // Get task info for project name
                 const task = await taskService.getById(taskId).catch(() => null);
