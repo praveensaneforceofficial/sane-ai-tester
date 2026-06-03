@@ -58,9 +58,15 @@ class CustomTaskRepository {
         );
         const oldStatus = currentRes.rows[0]?.status || '';
 
+        // If moved back to 'Testing Going' from 'Task Completed', clear test data so it can be retested
+        let extraUpdate = "";
+        if (status.toLowerCase() === 'testing going' && oldStatus.toLowerCase() === 'task completed') {
+            extraUpdate = ", task_id = NULL, report_generated = FALSE, report_id = NULL";
+        }
+
         const result = await db.query(
             `UPDATE custom_tasks 
-             SET status = $1, updated_at = NOW() 
+             SET status = $1, updated_at = NOW()${extraUpdate} 
              WHERE custom_task_id = $2 
              RETURNING *`,
             [status, customTaskId]
@@ -102,6 +108,14 @@ class CustomTaskRepository {
             values.push(val);
             idx++;
         }
+        
+        // If moved back to 'Testing Going' from 'Task Completed', clear test data so it can be retested
+        if (updateData.status && updateData.status.toLowerCase() === 'testing going' && oldStatus.toLowerCase() === 'task completed') {
+            fields.push(`task_id = NULL`);
+            fields.push(`report_generated = FALSE`);
+            fields.push(`report_id = NULL`);
+        }
+        
         values.push(customTaskId);
         const query = `UPDATE custom_tasks SET ${fields.join(', ')}, updated_at = NOW() WHERE custom_task_id = $${idx} RETURNING *`;
         const result = await db.query(query, values);
