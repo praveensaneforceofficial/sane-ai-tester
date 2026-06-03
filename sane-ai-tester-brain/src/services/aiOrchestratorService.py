@@ -14,6 +14,7 @@ class AIOrchestratorService:
     
     def __init__(self):
         self.abort_requested = False
+        self.processing_tasks = set()
         
     async def generate_test_prompt(self, url: str) -> str:
         """Generate test prompt using AI"""
@@ -150,76 +151,83 @@ class AIOrchestratorService:
             if self.abort_requested:
                 logger.warning("Orchestration aborted during Phase 1")
                 break
-            summary_results["processed_todo"] += 1
             task_id = task.get('custom_task_id')
-            title = task.get('title')
-            description = task.get('description', '')
-            priority = task.get('priority', 'medium')
-            
-            logger.info(f"Brain Agent checking if TODO task has enough details: {title} ({task_id})")
-
-            # Ask LLM if the description has enough details to test a web page
-            prompt = f"""
-            You are an AI QA Evaluator.
-            We have a task description submitted by a user for web page testing:
-            Task Title: {title}
-            Task Description: {description}
-            
-            Your job is to determine:
-            Is this description clear enough and does it contain enough details (like a URL/page to test and what to do) to test a web page?
-            For example, if there is no URL or the instructions are completely blank or nonsensical, it is NOT enough details.
-            If it has a URL (or clear local reference) and basic instructions, it IS enough details.
-            
-            Respond STRICTLY in JSON format with these exact keys:
-            {{
-                "enough_details": true/false (boolean),
-                "reason": "if not enough details, state a clear concise explanation, otherwise empty"
-            }}
-            """
-
-            messages = [
-                {"role": "system", "content": "You are a JSON-only AI responder. Do not include markdown code block formatting in your response. Output pure JSON."},
-                {"role": "user", "content": prompt}
-            ]
-
-            try:
-                # Use OpenAI if API key is present, otherwise fallback to Ollama
-                if settings.OPENAI_API_KEY:
-                    response_content = await openai_client.chat_completion(messages)
-                else:
-                    response_content = await ollama_client.chat_completion(messages)
-
-                clean_json = response_content.strip().replace("```json", "").replace("```", "").strip()
-                result = json.loads(clean_json)
-            except Exception as e:
-                logger.error(f"Failed to analyze task {task_id} details with AI: {e}")
-                result = {"enough_details": False, "reason": f"AI service failure: {str(e)}"}
-
-            if not result.get("enough_details", False):
-                # Move to Task Completed with fail due to lack of details
-                reason = result.get("reason", "Not enough details to test")
-                new_desc = f"[FAILED: Not enough details to test. Reason: {reason}]\n\n{description}"
+            if task_id in self.processing_tasks:
+                continue
                 
+            self.processing_tasks.add(task_id)
+            try:
+                summary_results["processed_todo"] += 1
+                title = task.get('title')
+                description = task.get('description', '')
+                priority = task.get('priority', 'medium')
+                
+                logger.info(f"Brain Agent checking if TODO task has enough details: {title} ({task_id})")
+
+                # Ask LLM if the description has enough details to test a web page
+                prompt = f"""
+                You are an AI QA Evaluator.
+                We have a task description submitted by a user for web page testing:
+                Task Title: {title}
+                Task Description: {description}
+                
+                Your job is to determine:
+                Is this description clear enough and does it contain enough details (like a URL/page to test and what to do) to test a web page?
+                For example, if there is no URL or the instructions are completely blank or nonsensical, it is NOT enough details.
+                If it has a URL (or clear local reference) and basic instructions, it IS enough details.
+                
+                Respond STRICTLY in JSON format with these exact keys:
+                {{
+                    "enough_details": true/false (boolean),
+                    "reason": "if not enough details, state a clear concise explanation, otherwise empty"
+                }}
+                """
+
+                messages = [
+                    {"role": "system", "content": "You are a JSON-only AI responder. Do not include markdown code block formatting in your response. Output pure JSON."},
+                    {"role": "user", "content": prompt}
+                ]
+
                 try:
-                    await api_bridge_service.update_custom_task(task_id, {
-                        "status": "Task Completed",
-                        "description": new_desc
-                    })
-                    summary_results["failed_todo"] += 1
-                    summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: Not enough details")
-                except Exception as ex:
-                    logger.error(f"Failed to update task {task_id} to COMPLETED: {ex}")
-            else:
-                # Enough details! Move to Test Case Ready
-                try:
-                    await api_bridge_service.update_custom_task(task_id, {
-                        "status": "Test Case Ready"
-                    })
-                    summary_results["test_case_ready"] += 1
-                    summary_results["messages"].append(f"Task '{title}' has enough details. Moved to TEST CASE READY")
-                    logger.info(f"Task '{title}' moved to Test Case Ready")
-                except Exception as ex:
-                    logger.error(f"Failed to update task {task_id} to Test Case Ready: {ex}")
+                    # Use OpenAI if API key is present, otherwise fallback to Ollama
+                    if settings.OPENAI_API_KEY:
+                        response_content = await openai_client.chat_completion(messages)
+                    else:
+                        response_content = await ollama_client.chat_completion(messages)
+
+                    clean_json = response_content.strip().replace("```json", "").replace("```", "").strip()
+                    result = json.loads(clean_json)
+                except Exception as e:
+                    logger.error(f"Failed to analyze task {task_id} details with AI: {e}")
+                    result = {"enough_details": False, "reason": f"AI service failure: {str(e)}"}
+
+                if not result.get("enough_details", False):
+                    # Move to Task Completed with fail due to lack of details
+                    reason = result.get("reason", "Not enough details to test")
+                    new_desc = f"[FAILED: Not enough details to test. Reason: {reason}]\n\n{description}"
+                    
+                    try:
+                        await api_bridge_service.update_custom_task(task_id, {
+                            "status": "Task Completed",
+                            "description": new_desc
+                        })
+                        summary_results["failed_todo"] += 1
+                        summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: Not enough details")
+                    except Exception as ex:
+                        logger.error(f"Failed to update task {task_id} to COMPLETED: {ex}")
+                else:
+                    # Enough details! Move to Test Case Ready
+                    try:
+                        await api_bridge_service.update_custom_task(task_id, {
+                            "status": "Test Case Ready"
+                        })
+                        summary_results["test_case_ready"] += 1
+                        summary_results["messages"].append(f"Task '{title}' has enough details. Moved to TEST CASE READY")
+                        logger.info(f"Task '{title}' moved to Test Case Ready")
+                    except Exception as ex:
+                        logger.error(f"Failed to update task {task_id} to Test Case Ready: {ex}")
+            finally:
+                self.processing_tasks.remove(task_id)
 
         # ----------------------------------------------------
         # Phase 2: Process tasks in status 'Test Case Ready' (Write Test Cases & Move to Testing Going)
@@ -231,59 +239,66 @@ class AIOrchestratorService:
                 logger.warning("Orchestration aborted during Phase 2")
                 break
             task_id = task.get('custom_task_id')
-            title = task.get('title')
-            description = task.get('description', '')
-            
-            logger.info(f"Brain Agent generating test cases for Test Case Ready task: {title} ({task_id})")
-
-            # Ask LLM to generate test instructions
-            prompt = f"""
-            You are an AI QA Engineer.
-            We have a validated task that is ready for test case writing:
-            Task Title: {title}
-            Task Description: {description}
-            
-            Your job is to generate a comprehensive set of step-by-step test cases/scenarios to test this web page (specifying any target URLs or login steps mentioned in the description).
-            
-            Respond STRICTLY in JSON format with these exact keys:
-            {{
-                "test_instructions": "clear step-by-step test instructions and possible scenarios string",
-                "url": "the extracted test URL string to open"
-            }}
-            """
-
-            messages = [
-                {"role": "system", "content": "You are a JSON-only AI responder. Do not include markdown code block formatting in your response. Output pure JSON."},
-                {"role": "user", "content": prompt}
-            ]
-
+            if task_id in self.processing_tasks:
+                continue
+                
+            self.processing_tasks.add(task_id)
             try:
-                # Use OpenAI if API key is present, otherwise fallback to Ollama
-                if settings.OPENAI_API_KEY:
-                    response_content = await openai_client.chat_completion(messages)
-                else:
-                    response_content = await ollama_client.chat_completion(messages)
+                title = task.get('title')
+                description = task.get('description', '')
+                
+                logger.info(f"Brain Agent generating test cases for Test Case Ready task: {title} ({task_id})")
 
-                clean_json = response_content.strip().replace("```json", "").replace("```", "").strip()
-                result = json.loads(clean_json)
-            except Exception as e:
-                logger.error(f"Failed to write test cases for task {task_id} with AI: {e}")
-                result = {"test_instructions": "Perform standard page verification.", "url": "https://dev.saneforce.com/"}
+                # Ask LLM to generate test instructions
+                prompt = f"""
+                You are an AI QA Engineer.
+                We have a validated task that is ready for test case writing:
+                Task Title: {title}
+                Task Description: {description}
+                
+                Your job is to generate a comprehensive set of step-by-step test cases/scenarios to test this web page (specifying any target URLs or login steps mentioned in the description).
+                
+                Respond STRICTLY in JSON format with these exact keys:
+                {{
+                    "test_instructions": "clear step-by-step test instructions and possible scenarios string",
+                    "url": "the extracted test URL string to open"
+                }}
+                """
 
-            test_cases_str = result.get("test_instructions", "Perform standard page verification.")
-            extracted_url = result.get("url", "")
-            
-            try:
-                # Update task with test instructions and status = 'Testing Going'
-                await api_bridge_service.update_custom_task(task_id, {
-                    "status": "Testing Going",
-                    "test_instructions": test_cases_str
-                })
-                summary_results["testing_going"] += 1
-                summary_results["messages"].append(f"Task '{title}': written possible test scenarios. Moved to TESTING GOING.")
-                logger.info(f"Task '{title}' written test cases and moved to Testing Going")
-            except Exception as ex:
-                logger.error(f"Failed to move task {task_id} to Testing Going: {ex}")
+                messages = [
+                    {"role": "system", "content": "You are a JSON-only AI responder. Do not include markdown code block formatting in your response. Output pure JSON."},
+                    {"role": "user", "content": prompt}
+                ]
+
+                try:
+                    # Use OpenAI if API key is present, otherwise fallback to Ollama
+                    if settings.OPENAI_API_KEY:
+                        response_content = await openai_client.chat_completion(messages)
+                    else:
+                        response_content = await ollama_client.chat_completion(messages)
+
+                    clean_json = response_content.strip().replace("```json", "").replace("```", "").strip()
+                    result = json.loads(clean_json)
+                except Exception as e:
+                    logger.error(f"Failed to write test cases for task {task_id} with AI: {e}")
+                    result = {"test_instructions": "Perform standard page verification.", "url": "https://dev.saneforce.com/"}
+
+                test_cases_str = result.get("test_instructions", "Perform standard page verification.")
+                extracted_url = result.get("url", "")
+                
+                try:
+                    # Update task with test instructions and status = 'Testing Going'
+                    await api_bridge_service.update_custom_task(task_id, {
+                        "status": "Testing Going",
+                        "test_instructions": test_cases_str
+                    })
+                    summary_results["testing_going"] += 1
+                    summary_results["messages"].append(f"Task '{title}': written possible test scenarios. Moved to TESTING GOING.")
+                    logger.info(f"Task '{title}' written test cases and moved to Testing Going")
+                except Exception as ex:
+                    logger.error(f"Failed to move task {task_id} to Testing Going: {ex}")
+            finally:
+                self.processing_tasks.remove(task_id)
 
         # ----------------------------------------------------
         # Phase 3: Process unassigned tasks in status 'Testing Going' (Assign to Online Workers)
@@ -459,117 +474,124 @@ class AIOrchestratorService:
                 logger.warning("Orchestration aborted during Phase 5")
                 break
             task_id = task.get('custom_task_id')
-            title = task.get('title')
-            description = task.get('description', '')
-            node_task_id = task.get('task_id')
-            report_id = task.get('report_id')
-            
-            if not node_task_id or not report_id:
+            if task_id in self.processing_tasks:
                 continue
                 
-            logger.info(f"AI evaluating report for: {title} (Report ID: {report_id})")
-
+            self.processing_tasks.add(task_id)
             try:
-                report = await api_bridge_service.get_report_by_task(node_task_id)
-                if not report:
+                title = task.get('title')
+                description = task.get('description', '')
+                node_task_id = task.get('task_id')
+                report_id = task.get('report_id')
+                
+                if not node_task_id or not report_id:
                     continue
                     
-                success_rate = report.get('success_rate', 100)
-                error_summary = report.get('error_summary', '')
-                
-                # Ask LLM to check report
-                report_prompt = f"""
-                You are an AI Brain QA Director.
-                We have a custom local task that has finished execution on a worker agent.
-                Task Title: {title}
-                Task Description: {description}
-                
-                Test Report details:
-                - Success Rate: {success_rate}%
-                - Error Summary: {error_summary}
-                - Report Metadata: {json.dumps(report.get('metadata', {}))}
-                
-                Determine:
-                1. Did the test complete successfully with all expected outcomes correct (e.g. success rate is high and no major critical blocks), or were there failures/issues?
-                2. Write a concise final status summary. If there is a failure, mention the exact issue/failure.
-                
-                Respond STRICTLY in JSON format with these exact keys:
-                {{
-                    "success": true/false (boolean),
-                    "summary": "concise final summary of the execution outcome and findings"
-                }}
-                """
+                logger.info(f"AI evaluating report for: {title} (Report ID: {report_id})")
 
-                messages = [
-                    {"role": "system", "content": "You are a JSON-only AI responder. Do not include markdown code block formatting in your response. Output pure JSON."},
-                    {"role": "user", "content": report_prompt}
-                ]
-
-                if settings.OPENAI_API_KEY:
-                    report_response = await openai_client.chat_completion(messages)
-                else:
-                    report_response = await ollama_client.chat_completion(messages)
-
-                clean_report_json = report_response.strip().replace("```json", "").replace("```", "").strip()
-                report_result = json.loads(clean_report_json)
-                
-                is_success = report_result.get("success", True)
-                summary_text = report_result.get("summary", "Test verified.")
-                
-                if is_success:
-                    final_desc = f"[SUCCESS: {summary_text}]\n\n{description}"
-                    await api_bridge_service.update_custom_task(task_id, {
-                        "status": "Task Completed",
-                        "description": final_desc
-                    })
-                    summary_results["completed_success"] += 1
-                    summary_results["messages"].append(f"Task '{title}' marked COMPLETED with SUCCESS!")
-                else:
-                    final_desc = f"[FAILED: {summary_text}]\n\n{description}"
-                    await api_bridge_service.update_custom_task(task_id, {
-                        "status": "Task Completed",
-                        "description": final_desc
-                    })
-                    summary_results["completed_failed"] += 1
-                    summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: {summary_text}")
-                    
-                # Handle Git Trigger PR comments if this task originated from one
-                if "[GIT_TRIGGER_REPO:" in description and "[GIT_TRIGGER_PR:" in description:
-                    try:
-                        import re
-                        repo_match = re.search(r'\[GIT_TRIGGER_REPO: (.*?)\]', description)
-                        pr_match = re.search(r'\[GIT_TRIGGER_PR: (\d+)\]', description)
+                try:
+                    report = await api_bridge_service.get_report_by_task(node_task_id)
+                    if not report:
+                        continue
                         
-                        if repo_match and pr_match:
-                            repo = repo_match.group(1).strip()
-                            pr_num = int(pr_match.group(1).strip())
-                            
-                            status_str = "Success" if is_success else "Failure"
-                            
-                            # Extract video link correctly from report or report_data
-                            video_link = report.get('video_path')
-                            if not video_link and isinstance(report.get('report_data'), dict):
-                                video_link = report.get('report_data').get('videoUrl')
-                            if not video_link:
-                                video_link = 'No video available'
-                            
-                            final_comment = f"Sane AI Tester :\nStatus : {status_str}\n\nVideo Link: {video_link}\n\nSummary:\n{summary_text}"
-                            await github_client.post_pr_comment(repo, pr_num, final_comment)
-                            
-                            # Update all associated git_triggers to 'completed'
-                            from connectors.api_bridge.rest_client import api_rest_client
-                            triggers = await api_rest_client.get("/api/tasks/git-triggers")
-                            if triggers:
-                                for t in triggers:
-                                    if t.get('pr_number') == pr_num and t.get('repository') == repo and t.get('status') != 'completed':
-                                        await api_rest_client.put(f"/api/tasks/git-triggers/{t['id']}/status", {"status": "completed"})
-                    except Exception as ge:
-                        logger.error(f"Error handling git trigger completion for custom task {task_id}: {ge}")
-
+                    success_rate = report.get('success_rate', 100)
+                    error_summary = report.get('error_summary', '')
                     
-            except Exception as e:
-                import traceback
-                logger.error(f"Error evaluating report for custom task {task_id}: {e}\n{traceback.format_exc()}")
+                    # Ask LLM to check report
+                    report_prompt = f"""
+                    You are an AI Brain QA Director.
+                    We have a custom local task that has finished execution on a worker agent.
+                    Task Title: {title}
+                    Task Description: {description}
+                    
+                    Test Report details:
+                    - Success Rate: {success_rate}%
+                    - Error Summary: {error_summary}
+                    - Report Metadata: {json.dumps(report.get('metadata', {}))}
+                    
+                    Determine:
+                    1. Did the test complete successfully with all expected outcomes correct (e.g. success rate is high and no major critical blocks), or were there failures/issues?
+                    2. Write a concise final status summary. If there is a failure, mention the exact issue/failure.
+                    
+                    Respond STRICTLY in JSON format with these exact keys:
+                    {{
+                        "success": true/false (boolean),
+                        "summary": "concise final summary of the execution outcome and findings"
+                    }}
+                    """
+
+                    messages = [
+                        {"role": "system", "content": "You are a JSON-only AI responder. Do not include markdown code block formatting in your response. Output pure JSON."},
+                        {"role": "user", "content": report_prompt}
+                    ]
+
+                    if settings.OPENAI_API_KEY:
+                        report_response = await openai_client.chat_completion(messages)
+                    else:
+                        report_response = await ollama_client.chat_completion(messages)
+
+                    clean_report_json = report_response.strip().replace("```json", "").replace("```", "").strip()
+                    report_result = json.loads(clean_report_json)
+                    
+                    is_success = report_result.get("success", True)
+                    summary_text = report_result.get("summary", "Test verified.")
+                    
+                    if is_success:
+                        final_desc = f"[SUCCESS: {summary_text}]\n\n{description}"
+                        await api_bridge_service.update_custom_task(task_id, {
+                            "status": "Task Completed",
+                            "description": final_desc
+                        })
+                        summary_results["completed_success"] += 1
+                        summary_results["messages"].append(f"Task '{title}' marked COMPLETED with SUCCESS!")
+                    else:
+                        final_desc = f"[FAILED: {summary_text}]\n\n{description}"
+                        await api_bridge_service.update_custom_task(task_id, {
+                            "status": "Task Completed",
+                            "description": final_desc
+                        })
+                        summary_results["completed_failed"] += 1
+                        summary_results["messages"].append(f"Task '{title}' marked COMPLETED with FAILURE: {summary_text}")
+                        
+                    # Handle Git Trigger PR comments if this task originated from one
+                    if "[GIT_TRIGGER_REPO:" in description and "[GIT_TRIGGER_PR:" in description:
+                        try:
+                            import re
+                            repo_match = re.search(r'\[GIT_TRIGGER_REPO: (.*?)\]', description)
+                            pr_match = re.search(r'\[GIT_TRIGGER_PR: (\d+)\]', description)
+                            
+                            if repo_match and pr_match:
+                                repo = repo_match.group(1).strip()
+                                pr_num = int(pr_match.group(1).strip())
+                                
+                                status_str = "Success" if is_success else "Failure"
+                                
+                                # Extract video link correctly from report or report_data
+                                video_link = report.get('video_path')
+                                if not video_link and isinstance(report.get('report_data'), dict):
+                                    video_link = report.get('report_data').get('videoUrl')
+                                if not video_link:
+                                    video_link = 'No video available'
+                                
+                                final_comment = f"Sane AI Tester :\nStatus : {status_str}\n\nVideo Link: {video_link}\n\nSummary:\n{summary_text}"
+                                await github_client.post_pr_comment(repo, pr_num, final_comment)
+                                
+                                # Update all associated git_triggers to 'completed'
+                                from connectors.api_bridge.rest_client import api_rest_client
+                                triggers = await api_rest_client.get("/api/tasks/git-triggers")
+                                if triggers:
+                                    for t in triggers:
+                                        if t.get('pr_number') == pr_num and t.get('repository') == repo and t.get('status') != 'completed':
+                                            await api_rest_client.put(f"/api/tasks/git-triggers/{t['id']}/status", {"status": "completed"})
+                        except Exception as ge:
+                            logger.error(f"Error handling git trigger completion for custom task {task_id}: {ge}")
+
+                        
+                except Exception as e:
+                    import traceback
+                    logger.error(f"Error evaluating report for custom task {task_id}: {e}\n{traceback.format_exc()}")
+            finally:
+                self.processing_tasks.remove(task_id)
 
         return summary_results
 
