@@ -51,16 +51,17 @@ RULES:
 8. Add generous page.waitForTimeout(2000) after logins or navigations before interacting with elements to ensure SPA renders completely.
 9. AMBIGUOUS SELECTIONS: If instructed to "select any division" or similar, DO NOT assume it's a <select> dropdown. It might be a list of radio buttons. Use 'await page.locator(\'input[type="radio"]\').first().click({ force: true })' as a highly effective fallback.
 10. GENERIC BUTTONS: If told to click "Enter" or "Submit", use 'await page.locator(\'text="Enter"\').first().click({ force: true })' or 'page.getByRole(\'button\', { name: /enter/i }).click()'. Do not assume the tag is exactly <button>.
+11. LOGGING: DO NOT use logger.error() or logger.warn() inside try-catch fallbacks. Use logger.info("attempting fallback...") instead, to avoid false-positive error reports.
 
 Example Robust Click:
 try {
     await page.click('select[name="division"]', { timeout: 5000 });
 } catch(e) {
-    logger.warn("Standard click failed, trying text locator");
+    logger.info("Standard click failed, attempting fallback text locator");
     try {
         await page.getByText('Division', { exact: false }).click({ timeout: 5000, force: true });
     } catch(e2) {
-        logger.warn("Text click failed, using X,Y coordinate click");
+        logger.info("Text click failed, attempting X,Y coordinate fallback");
         const loc = page.locator('select').first();
         const box = await loc.boundingBox();
         if (box) {
@@ -128,6 +129,8 @@ logger.info("Finished");
         
         const systemPrompt = `You are a QA Automation Reporter. 
 Based on the original test instructions and the execution logs provided, generate a concise, human-readable summary of what was tested, whether it succeeded, and any notable issues.
+
+CRITICAL RULE: Ignore logs mentioning "fallback", "Standard click failed", or "trying text locator". These are normal AI fallback mechanisms, NOT application errors. ONLY report an issue if the execution definitively fails.
 
 Format your response as a professional summary report (1-3 small paragraphs). No code, just natural language.`;
 
