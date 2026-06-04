@@ -107,7 +107,7 @@ class SocketManager {
                     duration: 0,
                     summary: resultData.summary || 'AI Auto-Test execution completed.',
                     report_data: JSON.stringify(resultData),
-                    video_path: resultData.videoPath || null,
+                    video_path: resultData.videoUrl || resultData.videoPath || null,
                     screenshots: JSON.stringify(resultData.screenshots || [])
                 });
 

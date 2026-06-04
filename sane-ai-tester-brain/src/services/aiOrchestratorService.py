@@ -496,6 +496,7 @@ class AIOrchestratorService:
                         
                     success_rate = report.get('success_rate', 100)
                     error_summary = report.get('error_summary', '')
+                    report_summary = report.get('summary', '')
                     
                     # Ask LLM to check report
                     report_prompt = f"""
@@ -507,11 +508,18 @@ class AIOrchestratorService:
                     Test Report details:
                     - Success Rate: {success_rate}%
                     - Error Summary: {error_summary}
+                    - AI Execution Summary: {report_summary}
                     - Report Metadata: {json.dumps(report.get('metadata', {}))}
                     
+                    IMPORTANT RULES FOR EVALUATION:
+                    1. The "AI Execution Summary" is the most reliable indicator of success or failure. It is written by the AI that actually executed the test.
+                    2. The "Success Rate" may sometimes show 0% for dynamic AI-generated scripts even when the test actually passed. DO NOT rely on success_rate alone.
+                    3. If the AI Execution Summary says the test passed/succeeded/completed successfully, mark it as success=true regardless of the success_rate number.
+                    4. Only mark success=false if the AI Execution Summary explicitly describes a failure, error, or unmet test objective.
+                    
                     Determine:
-                    1. Did the test complete successfully with all expected outcomes correct (e.g. success rate is high and no major critical blocks), or were there failures/issues?
-                    2. Write a concise final status summary. If there is a failure, mention the exact issue/failure.
+                    1. Did the test complete successfully with all expected outcomes correct, or were there actual failures/issues?
+                    2. Write a concise final status summary.
                     
                     Respond STRICTLY in JSON format with these exact keys:
                     {{
