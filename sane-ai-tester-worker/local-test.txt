@@ -1,15 +1,101 @@
 URL: https://dev.saneforce.com/
-PROMPT: 1. Open the browser and navigate to the URL provided. 
-2. Enter the login credentials: Username - 'admindev', Password - 'dev'. 
-3. Once logged in, select the division 'Bhandaree Consumer Products Pvt Ltd'. 
-4. Navigate to 'Activities' and click on 'Custom Fields Creation'. 
-5. Click on 'Add New Field' and create a new field with any type. 
-6. Save the new field and ensure no errors are displayed. 
-7. Navigate to 'Master' > 'Master New' > 'Doctor Master'. 
-8. Select any field force or use the default field force. 
-9. Click on 'View All Listed Dr.' and select any ID. 
-10. Use the three-dot menu to choose the 'Edit' option. 
-11. Scroll to the end of the page and verify that the newly created custom field is displayed in the 'Custom Field Attributes' group. 
-12. Enter any data into the new custom field and save the changes. 
-13. Return to the list page and select the same doctor. 
-14. Verify that the data entered into the custom field is saved and displayed correctly.
+PROMPT:
+TEST OBJECTIVE:
+Verify that a newly created Custom Field is correctly displayed, saved, and persisted in Doctor Master under the Custom Field Attributes section.
+
+TEST STEPS:
+
+1. Open the application and navigate to the provided URL.
+
+2. Login using:
+
+   * Username: admindev
+   * Password: dev
+
+3. After successful login, proceed using the default selected division and enter the application.
+
+4. Navigate to:
+   Activities → Custom Fields Creation
+
+5. Create a new Custom Field:
+
+   * Click "Add New Field"
+   * Use any supported field type
+   * Give the field a unique name using timestamp or random value to avoid duplicates
+   * Save the field
+
+6. Verify:
+
+   * Field creation completes successfully
+   * No validation errors are displayed
+   * No system errors, alerts, or exceptions appear
+
+7. Navigate to:
+   Master → Master New → Doctor Master
+
+8. Open the doctor listing:
+
+   * Use the default field force if already selected
+   * Otherwise select any available field force
+   * Click "View All Listed Dr."
+
+9. Select any doctor record from the list.
+
+10. Open the doctor in Edit mode using the available actions menu.
+
+11. Scroll through the doctor form and locate the section:
+    "Custom Field Attributes"
+
+12. Verify:
+
+    * The newly created custom field is visible in the Custom Field Attributes section
+    * The field label matches the field created earlier
+
+13. Enter a test value into the newly created custom field.
+
+14. Save the doctor record.
+
+15. Verify:
+
+    * Save operation completes successfully
+    * No validation errors are displayed
+    * No application errors are displayed
+
+16. Return to the doctor listing page.
+
+17. Reopen the same doctor record.
+
+18. Verify:
+
+    * The custom field still exists
+    * The value entered previously is displayed correctly
+    * The saved value matches exactly with the entered value
+
+19. Capture screenshots at important checkpoints:
+
+    * Custom Field Creation page
+    * Successful field creation
+    * Doctor Edit page
+    * Custom Field Attributes section
+    * Successful doctor save
+    * Reopened doctor showing persisted value
+
+EXPECTED RESULT:
+
+PASS if:
+
+* Custom field is created successfully.
+* Custom field appears in Doctor Master.
+* User can enter data into the field.
+* Doctor record saves successfully.
+* Saved custom field value persists after reopening the doctor record.
+* No application errors, JavaScript errors, validation failures, or unexpected popups occur.
+
+FAIL if:
+
+* Custom field creation fails.
+* Custom field does not appear in Doctor Master.
+* Field value cannot be entered.
+* Save operation fails.
+* Saved value is lost after reopening.
+* Any application error, exception, or unexpected behavior is detected.

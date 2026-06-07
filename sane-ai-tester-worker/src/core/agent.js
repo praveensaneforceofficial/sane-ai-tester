@@ -76,6 +76,11 @@ class Agent {
                 
                 // 1. Capture the current state (Screenshot + DOM)
                 const screenshotPath = await this.playwrightRunner.takeScreenshot(`step_${currentStepNum}`);
+                
+                if (!screenshotPath) {
+                    throw new Error(`Screenshot capture failed at step ${currentStepNum}. The browser or page may have been closed.`);
+                }
+
                 let domContext = "";
                 try {
                     domContext = await this.playwrightRunner.getCurrentDOM();

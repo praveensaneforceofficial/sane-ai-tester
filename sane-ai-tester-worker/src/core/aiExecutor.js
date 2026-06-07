@@ -57,8 +57,10 @@ RULES FOR nextPlaywrightCommand:
   * await page.waitForSelector('.dashboard', { timeout: 10000 });
   * await page.locator('text=Submit').click({ force: true });
   * await page.waitForTimeout(3000);
-- For clicking elements that may be tricky, use try-catch with a fallback:
+- For clicking elements that may be tricky, hidden, or inside hover cards/dropdowns, use try-catch with fallbacks and force clicks:
   try { await page.click('#exact-selector', { timeout: 5000 }); } catch(e) { await page.locator('text=Button Text').click({ force: true }); }
+- CRITICAL FOR DROPDOWNS/HOVER MENUS: If an element only appears when hovering over a card or parent menu, ALWAYS hover first, wait briefly, then click:
+  await page.locator('text=Parent Item').hover(); await page.waitForTimeout(500); await page.locator('text=Target Item').click({ force: true });
 - DO NOT include browser/context initialization code.
 - DO NOT return multiple unrelated steps — return only the immediate next action.
 - Add a brief logger.info() to describe what you're doing.
@@ -265,7 +267,8 @@ RULES:
 8. Add generous page.waitForTimeout(2000) after logins or navigations before interacting with elements to ensure SPA renders completely.
 9. AMBIGUOUS SELECTIONS: If instructed to "select any division" or similar, DO NOT assume it's a <select> dropdown. It might be a list of radio buttons. Use 'await page.locator('input[type="radio"]').first().click({ force: true })' as a highly effective fallback.
 10. GENERIC BUTTONS: If told to click "Enter" or "Submit", use 'await page.locator('text="Enter"').first().click({ force: true })' or 'page.getByRole('button', { name: /enter/i }).click()'. Do not assume the tag is exactly <button>.
-11. LOGGING: DO NOT use logger.error() or logger.warn() inside try-catch fallbacks. Use logger.info("attempting fallback...") instead, to avoid false-positive error reports.`;
+11. LOGGING: DO NOT use logger.error() or logger.warn() inside try-catch fallbacks. Use logger.info("attempting fallback...") instead, to avoid false-positive error reports.
+12. HOVER STATES: If an element might be hidden inside a dropdown or hover card, ALWAYS add a hover action before the click. Example: await page.locator('text=Parent').hover(); await page.waitForTimeout(500); await page.locator('text=Child').click({ force: true });`;
 
         let userPrompt = `Target URL: ${url}\nInstructions: ${prompt}\n\n`;
         if (domContext) {
