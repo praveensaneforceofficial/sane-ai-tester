@@ -31,8 +31,10 @@ const config = {
     AI_MODE: process.env.AI_MODE || 'local',
     OLLAMA_URL: process.env.OLLAMA_URL || 'http://localhost:11434',
     OLLAMA_MODEL: process.env.OLLAMA_MODEL || 'llama3',
+    OLLAMA_VISION_MODEL: process.env.OLLAMA_VISION_MODEL || 'llava',
     OPENAI_API_KEY: process.env.OPENAI_API_KEY,
     OPENAI_MODEL: process.env.OPENAI_MODEL || 'gpt-4o',
+    MAX_TASK_STEPS: parseInt(process.env.MAX_TASK_STEPS) || 40,
     
     // Logging
     LOG_LEVEL: process.env.LOG_LEVEL || 'info',

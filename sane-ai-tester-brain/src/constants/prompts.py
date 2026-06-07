@@ -7,6 +7,11 @@ Requirement: {requirement}
 Priority: {priority}
 Project: {project_name}
 
+Special Instructions for UI Flow:
+1. Admin Login & Division Selection: After login, the division selection screen has a default radio button selected. The user only needs to hit 'Enter' to proceed.
+2. Menu Navigation: Clicking any main menu opens a popup. The user must click the sub-menu item inside this popup to navigate.
+Please ensure the generated test cases accurately reflect these interactions.
+
 Generate test cases with:
 1. Test case ID (format: TC-{project_code}-001)
 2. Test scenario description

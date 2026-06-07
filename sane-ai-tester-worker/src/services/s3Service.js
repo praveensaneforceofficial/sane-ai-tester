@@ -32,12 +32,35 @@ class S3Service {
     }
 
     /**
-     * Upload a local file to Cloudflare R2
+     * Detect MIME type and R2 key prefix based on file extension.
+     * @param {string} filePath - Path to the file
+     * @returns {{ mimeType: string, keyPrefix: string }}
+     */
+    _detectFileType(filePath) {
+        const ext = path.extname(filePath).toLowerCase();
+        switch (ext) {
+            case '.png':
+                return { mimeType: 'image/png', keyPrefix: 'recordings/screenshots' };
+            case '.jpg':
+            case '.jpeg':
+                return { mimeType: 'image/jpeg', keyPrefix: 'recordings/screenshots' };
+            case '.webm':
+                return { mimeType: 'video/webm', keyPrefix: 'recordings/videos' };
+            case '.mp4':
+                return { mimeType: 'video/mp4', keyPrefix: 'recordings/videos' };
+            default:
+                return { mimeType: 'application/octet-stream', keyPrefix: 'recordings/other' };
+        }
+    }
+
+    /**
+     * Upload a local file to Cloudflare R2.
+     * Auto-detects MIME type and key prefix from file extension.
      * @param {string} filePath - Absolute path to the local file
-     * @param {string} mimeType - MIME type of the file (e.g., 'video/mp4')
+     * @param {string} [mimeTypeOverride] - Optional MIME type override
      * @returns {Promise<string|null>} - Public URL of the uploaded file or null
      */
-    async uploadFile(filePath, mimeType = 'video/mp4') {
+    async uploadFile(filePath, mimeTypeOverride) {
         if (!this.s3Client) {
             logger.warn("⚠️ S3 Client not initialized, skipping upload.");
             return null;
@@ -52,10 +75,15 @@ class S3Service {
             const fileBuffer = await fs.readFile(filePath);
             const fileName = path.basename(filePath);
             
+            // Auto-detect type or use override
+            const detected = this._detectFileType(filePath);
+            const mimeType = mimeTypeOverride || detected.mimeType;
+            const keyPrefix = detected.keyPrefix;
+            
             // Unique destination key using timestamp + original name
-            const key = `recordings/videos/${Date.now()}_${fileName}`;
+            const key = `${keyPrefix}/${Date.now()}_${fileName}`;
 
-            logger.info(`📤 Uploading file to R2: ${key}...`);
+            logger.info(`📤 Uploading file to R2: ${key} (${mimeType})...`);
 
             const command = new PutObjectCommand({
                 Bucket: this.bucketName,

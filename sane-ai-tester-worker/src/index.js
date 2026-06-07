@@ -24,7 +24,7 @@ async function fetchAndExecutePendingTasks(workerId) {
 
         // Only pick up FRESH pending tasks (created within last 2 hours)
         // This prevents old stale tasks from being re-executed on every restart
-        const TWO_HOURS_MS = 2 * 60 * 60 * 1000;
+        const TWO_HOURS_MS = 48 * 60 * 60 * 1000;
         const now = Date.now();
         const pendingTasks = tasks.filter(t => {
             if (t.status !== 'pending') return false;
@@ -190,6 +190,7 @@ async function showInteractiveMenu() {
             name: 'action',
             message: 'Select an option:',
             choices: [
+                { title: '🧪 Test Local', value: 'test_local' },
                 { title: '✏️  Change Nickname', value: 'nickname' },
                 { title: currentStatus === 'offline' ? '🟢 Go Online' : '🔴 Go Offline', value: 'status' },
                 { title: '❌ Exit Agent', value: 'exit' }
@@ -198,7 +199,10 @@ async function showInteractiveMenu() {
 
         if (!response.action) break;
 
-        if (response.action === 'nickname') {
+        if (response.action === 'test_local') {
+            await runLocalTest();
+        }
+        else if (response.action === 'nickname') {
             const nickResponse = await prompts({
                 type: 'text',
                 name: 'newNickname',
@@ -222,6 +226,75 @@ async function showInteractiveMenu() {
             socketClient.disconnect();
             process.exit(0);
         }
+    }
+}
+
+async function runLocalTest() {
+    logger.info("🧪 Starting local debug test...");
+    try {
+        const fs = require('fs-extra');
+        const path = require('path');
+        const testFile = path.resolve(__dirname, '../local-test.txt');
+        
+        if (!await fs.pathExists(testFile)) {
+            logger.warn("local-test.txt not found. Creating a template file...");
+            await fs.writeFile(testFile, "URL: https://dev.saneforce.com/\nPROMPT: Navigate to the site and verify it loads.");
+            logger.info(`Template created at: ${testFile}. Please edit it and try again.`);
+            return;
+        }
+
+        const content = await fs.readFile(testFile, 'utf8');
+        const urlMatch = content.match(/URL:\s*(.+)/i);
+        const promptMatch = content.match(/PROMPT:\s*([\s\S]+)/i);
+
+        if (!urlMatch || !promptMatch) {
+            logger.error("❌ Invalid format in local-test.txt. It must contain 'URL: <url>' and 'PROMPT: <instructions>'.");
+            return;
+        }
+
+        const url = urlMatch[1].trim();
+        const promptStr = promptMatch[1].trim();
+
+        logger.info(`🌐 Local Test URL: ${url}`);
+        logger.info(`📋 Local Test Prompt: ${promptStr}`);
+
+        // Mock socket that doesn't send anything to server
+        const mockSocket = {
+            emit: (event, data) => logger.info(`[MOCK SOCKET EMIT] ${event}`, data),
+            connected: true
+        };
+
+        const { Agent } = require('./core/agent');
+        const localAgent = new (require('./core/agent'))('local-debug-worker', mockSocket, { enableRecording: true });
+        
+        await localAgent.start();
+        
+        const taskPayload = {
+            taskId: `local-debug-${Date.now()}`,
+            url: url,
+            prompt: promptStr
+        };
+
+        const result = await localAgent.executeTask(taskPayload);
+        
+        console.log("\n==================================================");
+        console.log("             🧪 LOCAL TEST RESULTS                ");
+        console.log("==================================================");
+        console.log(`Status:   ${result.status}`);
+        console.log(`Duration: ${result.duration} ms`);
+        if (result.error) console.log(`Error:    ${result.error}`);
+        console.log(`\nSummary:\n${result.summary || 'No summary generated'}`);
+        console.log("\nFull Result Data:");
+        console.log(JSON.stringify(result, null, 2));
+        console.log("==================================================\n");
+
+        await localAgent.cleanup();
+        
+        // Wait a bit before showing the menu again
+        await new Promise(r => setTimeout(r, 2000));
+        
+    } catch (err) {
+        logger.error(`❌ Local test failed: ${err.message}`);
     }
 }
 

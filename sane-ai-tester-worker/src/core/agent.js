@@ -13,7 +13,7 @@ class Agent {
         this.currentTask = null;
         this.enableRecording = options.enableRecording || false;
         this.playwrightRunner = null;
-        this.aiExecutor = new AIExecutor();
+        this.aiExecutor = new AIExecutor(); // Assumed to handle vision inputs now
         this.taskHistory = [];
         
         if (this.enableRecording) {
@@ -40,11 +40,6 @@ class Agent {
     }
     
     async executeTask(task) {
-        if (this.currentTask) {
-            logger.warn("⚠️ Already executing a task, skipping new assignment...");
-            return;
-        }
-        
         this.currentTask = task;
         const startTime = Date.now();
         let resultData = {
@@ -58,79 +53,109 @@ class Agent {
         };
         
         try {
-            logger.info(`🎯 Executing task ID: ${task.taskId || task.id}`);
+            logger.info(`🎯 Executing step-by-step interactive task ID: ${task.taskId || task.id}`);
             
-            // Emit task start back to central server
             this.socket.emit('worker:task:start', {
                 taskId: task.taskId || task.id,
                 workerId: this.workerId
             });
-            
-            const instructions = task.prompt || task.test_instructions || 'Navigate and check page';
-            
-            // 0. Extract DOM Selector Context to assist the AI
-            let domContext = "";
-            try {
-                logger.info(`🔍 Fetching live DOM context from ${task.url} to guide the AI...`);
-                domContext = await this.playwrightRunner.getDOMContext(task.url);
-            } catch (domErr) {
-                logger.warn(`⚠️ Could not retrieve live DOM context: ${domErr.message}`);
-            }
 
-            // 1 & 2. Generate and Execute with Self-Correction Retry Loop
-            let executionResult;
-            let currentScriptCode = "";
-            let errorContext = "";
-            const MAX_RETRIES = 2; // 1 initial attempt + 2 retries
+            // Initial navigation
+            await this.playwrightRunner.goto(task.url);
             
-            for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-                if (attempt > 0) {
-                    logger.info(`🔄 Self-Correction Retry ${attempt}/${MAX_RETRIES} due to error...`);
-                    const retryInstructions = `${instructions}\n\nCRITICAL FIX NEEDED: The previous attempt failed with this error:\n"${errorContext}"\n\nPlease correct the Playwright script to fix this error (e.g., try an alternate selector from the DOM context, add waitForTimeout, or handle the error gracefully).`;
-                    currentScriptCode = await this.aiExecutor.generatePlaywrightScript(retryInstructions, task.url, domContext);
-                } else {
-                    currentScriptCode = await this.aiExecutor.generatePlaywrightScript(instructions, task.url, domContext);
-                }
+            let objective = task.prompt || task.test_instructions || 'Navigate and check page';
+            let isTaskComplete = false;
+            let currentStepNum = 1;
+            let executionLogs = [];
+            let lastErrorAnalysis = null;
+            const MAX_STEPS = 50; // Circuit breaker to prevent infinite AI loops
+
+            // Main Interactive Loop
+            while (!isTaskComplete && currentStepNum <= MAX_STEPS) {
+                logger.info(`📍 --- Processing Step/Level ${currentStepNum} ---`);
                 
-                executionResult = await this.playwrightRunner.executeDynamicScript(currentScriptCode, {
-                    url: task.url,
-                    taskId: task.taskId || task.id
+                // 1. Capture the current state (Screenshot + DOM)
+                const screenshotPath = await this.playwrightRunner.takeScreenshot(`step_${currentStepNum}`);
+                let domContext = "";
+                try {
+                    domContext = await this.playwrightRunner.getCurrentDOM();
+                } catch (e) {
+                    logger.warn(`Could not fetch DOM: ${e.message}`);
+                }
+
+                // 2. Upload screenshot to R2 so AI (or central server) can access via URL if needed
+                const publicScreenshotUrl = await s3Service.uploadFile(screenshotPath);
+
+                // 3. Ask AI to analyze the screenshot + state
+                // The AI determines if there's an error, and returns either the next command OR a fix.
+                logger.info(`🧠 Sending screenshot to AI for validation and next instruction...`);
+                const aiResponse = await this.aiExecutor.analyzeStateAndGetNextStep({
+                    objective,
+                    currentStepNum,
+                    screenshotUrl: publicScreenshotUrl,
+                    localScreenshotPath: screenshotPath, // alternative if using local base64
+                    domContext,
+                    lastError: lastErrorAnalysis
                 });
+
+                // Expecting aiResponse structure: 
+                // { isComplete: boolean, hasError: boolean, errorAnalysis: string, nextPlaywrightCommand: string }
                 
-                if (executionResult.success) {
-                    if (attempt > 0) logger.info(`✅ Self-Correction successful on attempt ${attempt + 1}!`);
+                if (aiResponse.isComplete) {
+                    logger.info(`🎉 AI declared objective accomplished at step ${currentStepNum}!`);
+                    isTaskComplete = true;
+                    resultData.status = 'completed';
                     break;
+                }
+
+                if (aiResponse.hasError) {
+                    logger.warn(`⚠️ AI Detected an error on the screen: ${aiResponse.errorAnalysis}`);
+                    lastErrorAnalysis = aiResponse.errorAnalysis;
+                    
+                    // Emit error back to Server/SI immediately from this exact point
+                    this.socket.emit('worker:task:step_error', {
+                        taskId: task.taskId || task.id,
+                        step: currentStepNum,
+                        errorAnalysis: aiResponse.errorAnalysis,
+                        screenshotUrl: publicScreenshotUrl
+                    });
                 } else {
-                    errorContext = executionResult.error;
-                    logger.warn(`⚠️ Execution failed on attempt ${attempt + 1}: ${errorContext}`);
+                    // Clear error context if current step looks clean
+                    lastErrorAnalysis = null; 
                 }
-            }
-            
-            resultData.status = executionResult.success ? 'completed' : 'failed';
-            resultData.data = executionResult.data;
-            
-            if (!executionResult.success) {
-                resultData.error = executionResult.error;
+
+                // 4. Execute the single instruction given by the AI from this specific point
+                if (aiResponse.nextPlaywrightCommand) {
+                    logger.info(`⚡ Executing AI Instruction: ${aiResponse.nextPlaywrightCommand}`);
+                    const stepResult = await this.playwrightRunner.executeSingleCommand(aiResponse.nextPlaywrightCommand);
+                    
+                    executionLogs.push(`Step ${currentStepNum}: ${aiResponse.nextPlaywrightCommand} -> Success: ${stepResult.success}`);
+                    
+                    if (!stepResult.success) {
+                        // Infrastructure/Playwright code level execution crash
+                        lastErrorAnalysis = `Playwright Execution Failed: ${stepResult.error}`;
+                    }
+                }
+
+                currentStepNum++;
             }
 
-            // 3. Generate Human-Readable Summary using AI
-            const rawLogs = executionResult.logs ? executionResult.logs.join('\n') : '';
-            const summary = await this.aiExecutor.generateSummary(instructions, rawLogs, executionResult.success);
+            if (currentStepNum > MAX_STEPS && !isTaskComplete) {
+                throw new Error(`Task stopped: Reached maximum step limit of ${MAX_STEPS}`);
+            }
+
+            // Generate Summary based on step history
+            const summary = await this.aiExecutor.generateSummary(objective, executionLogs.join('\n'), resultData.status === 'completed');
             resultData.summary = summary;
-            logger.info(`📝 AI Summary Generated:\n${summary}`);
 
-            // 4. Upload video to Cloudflare R2
-            if (executionResult.videoPath) {
-                logger.info(`⏳ Uploading execution video to Cloudflare R2...`);
-                const publicVideoUrl = await s3Service.uploadFile(executionResult.videoPath);
-                if (publicVideoUrl) {
-                    resultData.videoUrl = publicVideoUrl;
+            // Handle optional video upload
+            if (this.enableRecording) {
+                const videoPath = await this.playwrightRunner.getVideoPath();
+                if (videoPath) {
+                    resultData.videoUrl = await s3Service.uploadFile(videoPath);
                 }
             }
-            
-            logger.info(`✅ Task ${task.taskId || task.id} completed with status: ${resultData.status}`);
-            
-            // Emit success back to API
+
             this.socket.emit('worker:task:complete', {
                 taskId: task.taskId || task.id,
                 workerId: this.workerId,
@@ -150,7 +175,6 @@ class Agent {
         }
         
         resultData.duration = Date.now() - startTime;
-        
         this.taskHistory.push({
             taskId: task.taskId || task.id,
             timestamp: new Date().toISOString(),

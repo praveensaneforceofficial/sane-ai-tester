@@ -1,4 +1,6 @@
 const axios = require('axios');
+const fs = require('fs-extra');
+const path = require('path');
 const logger = require('../utils/logger');
 const config = require('../utils/config');
 
@@ -10,6 +12,218 @@ class AIExecutor {
         this.openaiKey = config.OPENAI_API_KEY;
         this.openaiModel = config.OPENAI_MODEL;
     }
+
+    // =========================================================================
+    // NEW: Vision-based step-by-step analysis (used by the new agent.js)
+    // =========================================================================
+
+    /**
+     * Analyzes the current screenshot + DOM state and returns the next action.
+     * Uses OpenAI Vision API (gpt-4o with image) or Ollama vision model (llava).
+     * 
+     * @param {Object} params
+     * @param {string} params.objective - The overall test objective/instructions
+     * @param {number} params.currentStepNum - Current step number
+     * @param {string} params.screenshotUrl - Public URL of the screenshot (for OpenAI)
+     * @param {string} params.localScreenshotPath - Local file path of screenshot (for Ollama/base64)
+     * @param {string} params.domContext - DOM context string from getCurrentDOM()
+     * @param {string|null} params.lastError - Error from the previous step, if any
+     * @returns {Promise<{isComplete: boolean, hasError: boolean, errorAnalysis: string, nextPlaywrightCommand: string}>}
+     */
+    async analyzeStateAndGetNextStep(params) {
+        const { objective, currentStepNum, screenshotUrl, localScreenshotPath, domContext, lastError } = params;
+        
+        logger.info(`🧠 AI Vision Analysis — Step ${currentStepNum}...`);
+
+        const systemPrompt = `You are a Senior QA Automation Agent with VISION capabilities.
+You are controlling a web browser step-by-step to accomplish a test objective.
+You can SEE the current screenshot of the browser page.
+
+YOUR TASK:
+1. Look at the screenshot carefully.
+2. Read the DOM context provided (available form inputs, buttons, links).
+3. Determine if the objective has been accomplished.
+4. If NOT accomplished, determine the SINGLE NEXT Playwright command to execute.
+5. If you see an application error on the screen (error message, red alert, 404, etc.), report it.
+
+RULES FOR nextPlaywrightCommand:
+- Return EXACTLY ONE Playwright action as raw JavaScript code.
+- The code has access to 'page' (Playwright Page object) and 'logger' (logging).
+- Use robust selectors from the DOM context provided.
+- Examples of valid commands:
+  * await page.fill('#txtUserName', 'admin');
+  * await page.click('#btnLogin');
+  * await page.selectOption('select[name="division"]', 'value');
+  * await page.waitForSelector('.dashboard', { timeout: 10000 });
+  * await page.locator('text=Submit').click({ force: true });
+  * await page.waitForTimeout(3000);
+- For clicking elements that may be tricky, use try-catch with a fallback:
+  try { await page.click('#exact-selector', { timeout: 5000 }); } catch(e) { await page.locator('text=Button Text').click({ force: true }); }
+- DO NOT include browser/context initialization code.
+- DO NOT return multiple unrelated steps — return only the immediate next action.
+- Add a brief logger.info() to describe what you're doing.
+
+RESPONSE FORMAT:
+You MUST respond with ONLY a valid JSON object. No markdown, no backticks, no explanations outside the JSON.
+{
+    "isComplete": false,
+    "hasError": false,
+    "errorAnalysis": "",
+    "nextPlaywrightCommand": "await page.click('#submit');"
+}
+
+- Set "isComplete": true when the test objective appears to be fully accomplished based on what you see on the screen.
+- Set "hasError": true if you see an application error (NOT a Playwright error) on the screen, and describe it in "errorAnalysis".
+- If hasError is true, still provide a nextPlaywrightCommand if possible (e.g., to dismiss the error or retry).
+- If isComplete is true, nextPlaywrightCommand can be empty.`;
+
+        let userPrompt = `OBJECTIVE: ${objective}\n`;
+        userPrompt += `CURRENT STEP: ${currentStepNum}\n`;
+        if (lastError) {
+            userPrompt += `\n⚠️ PREVIOUS STEP ERROR: ${lastError}\nPlease account for this error and adjust your next action accordingly.\n`;
+        }
+        if (domContext) {
+            userPrompt += `\nDOM CONTEXT OF CURRENT PAGE:\n${domContext}\n`;
+        }
+        userPrompt += `\nAnalyze the attached screenshot and determine the next action to accomplish the objective.`;
+
+        try {
+            let rawResponse = "";
+
+            if (this.aiMode === 'openai' && this.openaiKey) {
+                rawResponse = await this.callOpenAIVision(systemPrompt, userPrompt, screenshotUrl, localScreenshotPath);
+            } else if (this.aiMode === 'local') {
+                rawResponse = await this.callOllamaVision(systemPrompt, userPrompt, localScreenshotPath);
+            } else {
+                // Auto-detect: prefer OpenAI if key exists, otherwise Ollama
+                if (this.openaiKey) {
+                    rawResponse = await this.callOpenAIVision(systemPrompt, userPrompt, screenshotUrl, localScreenshotPath);
+                } else {
+                    rawResponse = await this.callOllamaVision(systemPrompt, userPrompt, localScreenshotPath);
+                }
+            }
+
+            // Parse JSON from AI response (strip any accidental markdown)
+            const cleaned = rawResponse
+                .replace(/^```json\s*/i, '')
+                .replace(/^```\s*/i, '')
+                .replace(/```\s*$/i, '')
+                .trim();
+            
+            const parsed = JSON.parse(cleaned);
+
+            // Validate expected fields
+            return {
+                isComplete: parsed.isComplete === true,
+                hasError: parsed.hasError === true,
+                errorAnalysis: parsed.errorAnalysis || "",
+                nextPlaywrightCommand: parsed.nextPlaywrightCommand || ""
+            };
+
+        } catch (error) {
+            logger.error(`❌ AI Vision Analysis failed: ${error.message}`);
+            // Return a safe fallback — don't crash the loop
+            return {
+                isComplete: false,
+                hasError: true,
+                errorAnalysis: `AI analysis failed: ${error.message}`,
+                nextPlaywrightCommand: "await page.waitForTimeout(2000);"
+            };
+        }
+    }
+
+    /**
+     * Call OpenAI API with vision (image_url) support.
+     * Uses gpt-4o which supports image inputs natively.
+     */
+    async callOpenAIVision(systemPrompt, userPrompt, imageUrl, localImagePath) {
+        // Build the image content block
+        let imageContent;
+        if (imageUrl) {
+            // Use public URL (preferred — already uploaded to R2)
+            imageContent = {
+                type: "image_url",
+                image_url: { url: imageUrl, detail: "high" }
+            };
+        } else if (localImagePath) {
+            // Fallback: read local file as base64
+            const imageBuffer = await fs.readFile(localImagePath);
+            const base64 = imageBuffer.toString('base64');
+            imageContent = {
+                type: "image_url",
+                image_url: { url: `data:image/png;base64,${base64}`, detail: "high" }
+            };
+        } else {
+            throw new Error("No screenshot available for vision analysis");
+        }
+
+        try {
+            const response = await axios.post('https://api.openai.com/v1/chat/completions', {
+                model: this.openaiModel || 'gpt-4o',
+                messages: [
+                    { role: 'system', content: systemPrompt },
+                    { 
+                        role: 'user', 
+                        content: [
+                            { type: "text", text: userPrompt },
+                            imageContent
+                        ]
+                    }
+                ],
+                temperature: 0.2,
+                max_tokens: 1500
+            }, {
+                headers: {
+                    'Authorization': `Bearer ${this.openaiKey}`,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 60000 // 60s timeout for vision requests
+            });
+
+            return response.data.choices[0].message.content;
+
+        } catch (error) {
+            logger.error(`OpenAI Vision API error: ${error.response ? JSON.stringify(error.response.data) : error.message}`);
+            throw error;
+        }
+    }
+
+    /**
+     * Call Ollama with a vision-capable model (e.g., llava, bakllava).
+     * Sends the screenshot as base64 in the 'images' field.
+     */
+    async callOllamaVision(systemPrompt, userPrompt, localImagePath) {
+        let images = [];
+        if (localImagePath) {
+            const imageBuffer = await fs.readFile(localImagePath);
+            images = [imageBuffer.toString('base64')];
+        }
+
+        try {
+            // Use a vision-capable model (llava) instead of text-only llama3
+            const visionModel = config.OLLAMA_VISION_MODEL || 'llava';
+            
+            const response = await axios.post(`${this.ollamaUrl}/api/generate`, {
+                model: visionModel,
+                prompt: `${systemPrompt}\n\n${userPrompt}`,
+                images: images,
+                stream: false,
+                temperature: 0.2
+            }, {
+                timeout: 120000 // 120s timeout for local vision models
+            });
+
+            return response.data.response;
+
+        } catch (error) {
+            logger.error(`Ollama Vision API error: ${error.message}`);
+            throw error;
+        }
+    }
+
+    // =========================================================================
+    // EXISTING: Text-only methods (kept for generateSummary and legacy use)
+    // =========================================================================
     
     /**
      * Generates a raw Playwright JavaScript script based on the task prompt/instructions.
@@ -49,41 +263,9 @@ RULES:
      if (box) await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
    CRITICAL WARNING: NEVER use Playwright pseudo-selectors (like :has-text) inside document.querySelector! document.querySelector only supports standard CSS.
 8. Add generous page.waitForTimeout(2000) after logins or navigations before interacting with elements to ensure SPA renders completely.
-9. AMBIGUOUS SELECTIONS: If instructed to "select any division" or similar, DO NOT assume it's a <select> dropdown. It might be a list of radio buttons. Use 'await page.locator(\'input[type="radio"]\').first().click({ force: true })' as a highly effective fallback.
-10. GENERIC BUTTONS: If told to click "Enter" or "Submit", use 'await page.locator(\'text="Enter"\').first().click({ force: true })' or 'page.getByRole(\'button\', { name: /enter/i }).click()'. Do not assume the tag is exactly <button>.
-11. LOGGING: DO NOT use logger.error() or logger.warn() inside try-catch fallbacks. Use logger.info("attempting fallback...") instead, to avoid false-positive error reports.
-
-Example Robust Click:
-try {
-    await page.click('select[name="division"]', { timeout: 5000 });
-} catch(e) {
-    logger.info("Standard click failed, attempting fallback text locator");
-    try {
-        await page.getByText('Division', { exact: false }).click({ timeout: 5000, force: true });
-    } catch(e2) {
-        logger.info("Text click failed, attempting X,Y coordinate fallback");
-        const loc = page.locator('select').first();
-        const box = await loc.boundingBox();
-        if (box) {
-            await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
-        } else {
-            // Absolute last resort raw JS
-            await page.evaluate(() => { 
-                const el = document.querySelector('select'); 
-                if(el) el.click(); 
-            });
-        }
-    }
-}
-
-Example Output format:
-logger.info("Starting execution");
-await page.waitForTimeout(2000);
-await page.waitForSelector('input[name="username"]', { state: 'attached' });
-await page.fill('input[name="username"]', 'admin');
-await page.click('button[type="submit"]');
-logger.info("Finished");
-`;
+9. AMBIGUOUS SELECTIONS: If instructed to "select any division" or similar, DO NOT assume it's a <select> dropdown. It might be a list of radio buttons. Use 'await page.locator('input[type="radio"]').first().click({ force: true })' as a highly effective fallback.
+10. GENERIC BUTTONS: If told to click "Enter" or "Submit", use 'await page.locator('text="Enter"').first().click({ force: true })' or 'page.getByRole('button', { name: /enter/i }).click()'. Do not assume the tag is exactly <button>.
+11. LOGGING: DO NOT use logger.error() or logger.warn() inside try-catch fallbacks. Use logger.info("attempting fallback...") instead, to avoid false-positive error reports.`;
 
         let userPrompt = `Target URL: ${url}\nInstructions: ${prompt}\n\n`;
         if (domContext) {

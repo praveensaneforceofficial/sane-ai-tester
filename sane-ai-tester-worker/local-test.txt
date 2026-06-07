@@ -1,0 +1,15 @@
+URL: https://dev.saneforce.com/
+PROMPT: 1. Open the browser and navigate to the URL provided. 
+2. Enter the login credentials: Username - 'admindev', Password - 'dev'. 
+3. Once logged in, select the division 'Bhandaree Consumer Products Pvt Ltd'. 
+4. Navigate to 'Activities' and click on 'Custom Fields Creation'. 
+5. Click on 'Add New Field' and create a new field with any type. 
+6. Save the new field and ensure no errors are displayed. 
+7. Navigate to 'Master' > 'Master New' > 'Doctor Master'. 
+8. Select any field force or use the default field force. 
+9. Click on 'View All Listed Dr.' and select any ID. 
+10. Use the three-dot menu to choose the 'Edit' option. 
+11. Scroll to the end of the page and verify that the newly created custom field is displayed in the 'Custom Field Attributes' group. 
+12. Enter any data into the new custom field and save the changes. 
+13. Return to the list page and select the same doctor. 
+14. Verify that the data entered into the custom field is saved and displayed correctly.

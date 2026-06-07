@@ -25,7 +25,166 @@ class PlaywrightRunner {
         
         logger.info("✅ Playwright Browser launched successfully");
     }
-    
+
+    // =========================================================================
+    // NEW: Step-by-step vision loop methods (used by the new agent.js)
+    // =========================================================================
+
+    /**
+     * Navigate to a URL using a persistent browser context.
+     * The context + page stay alive across all steps of a task.
+     * @param {string} url - Target URL to navigate to
+     */
+    async goto(url) {
+        // Create a persistent context if one doesn't exist
+        if (!this.context || !this.page) {
+            const contextOptions = {
+                viewport: { width: 1280, height: 720 },
+                userAgent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+                recordVideo: this.recordVideo ? {
+                    dir: this.videoPath,
+                    size: { width: 1280, height: 720 }
+                } : undefined
+            };
+
+            this.context = await this.browser.newContext(contextOptions);
+            this.page = await this.context.newPage();
+            logger.info("✅ Persistent browser context created for task");
+        }
+
+        logger.info(`🌐 Navigating to: ${url}`);
+        await this.page.goto(url, { waitUntil: 'networkidle', timeout: 30000 });
+        // Wait for SPA frameworks to fully render
+        await this.page.waitForTimeout(2000);
+        logger.info(`✅ Page loaded: ${url}`);
+    }
+
+    /**
+     * Extract DOM context (inputs, buttons, links) from the CURRENT live page.
+     * Unlike the old getDOMContext(), this does NOT open a temp tab — it reads from the active page.
+     * @returns {Promise<string>} Formatted DOM context string
+     */
+    async getCurrentDOM() {
+        if (!this.page) {
+            throw new Error("No active page. Call goto() first.");
+        }
+
+        const context = await this.page.evaluate(() => {
+            const inputs = Array.from(document.querySelectorAll('input, select, textarea')).map(el => {
+                return `Input - name: "${el.name || ''}", id: "${el.id || ''}", type: "${el.type || ''}", placeholder: "${el.placeholder || ''}", value: "${el.value || ''}"`;
+            });
+            const buttons = Array.from(document.querySelectorAll('button, input[type="submit"], input[type="button"], a.btn, button.btn, [role="button"]')).map(el => {
+                return `Button - text: "${(el.innerText || el.value || '').substring(0, 80)}", id: "${el.id || ''}", name: "${el.name || ''}", class: "${el.className || ''}"`;
+            });
+            const links = Array.from(document.querySelectorAll('a[href]')).map(el => {
+                return `Link - text: "${(el.innerText || '').substring(0, 60)}", href: "${el.href || ''}", id: "${el.id || ''}"`;
+            });
+            const selects = Array.from(document.querySelectorAll('select')).map(el => {
+                const options = Array.from(el.options).map(o => o.text).slice(0, 5).join(', ');
+                return `Select - name: "${el.name || ''}", id: "${el.id || ''}", options: [${options}]`;
+            });
+            return {
+                title: document.title,
+                url: window.location.href,
+                inputs: inputs.slice(0, 20),
+                buttons: buttons.slice(0, 15),
+                links: links.slice(0, 10),
+                selects: selects.slice(0, 10)
+            };
+        });
+
+        let result = `Page Title: "${context.title}"\nCurrent URL: ${context.url}\n`;
+        if (context.inputs.length > 0)  result += `\nAvailable Inputs:\n${context.inputs.join('\n')}`;
+        if (context.selects.length > 0) result += `\nAvailable Selects:\n${context.selects.join('\n')}`;
+        if (context.buttons.length > 0) result += `\nAvailable Buttons:\n${context.buttons.join('\n')}`;
+        if (context.links.length > 0)   result += `\nAvailable Links:\n${context.links.join('\n')}`;
+        return result;
+    }
+
+    /**
+     * Execute a single Playwright command string on the live page.
+     * The command is raw JS code like: await page.click('#submit')
+     * @param {string} commandString - Raw Playwright JS command(s)
+     * @returns {Promise<{success: boolean, error: string|null}>}
+     */
+    async executeSingleCommand(commandString) {
+        if (!this.page) {
+            return { success: false, error: "No active page. Call goto() first." };
+        }
+
+        try {
+            const AsyncFunction = Object.getPrototypeOf(async function(){}).constructor;
+            const dynamicExecution = new AsyncFunction('page', 'logger', commandString);
+            
+            const scriptLogger = {
+                info: (msg) => logger.info(`[Step Command] ${msg}`),
+                warn: (msg) => logger.warn(`[Step Command] ${msg}`),
+                error: (msg) => logger.error(`[Step Command] ${msg}`)
+            };
+
+            await dynamicExecution(this.page, scriptLogger);
+            
+            // Wait for any navigation/render triggered by the command
+            await this.page.waitForTimeout(1500);
+            
+            return { success: true, error: null };
+        } catch (error) {
+            logger.error(`❌ Single command execution failed: ${error.message}`);
+            return { success: false, error: error.message };
+        }
+    }
+
+    /**
+     * Get the video recording path from the current persistent page.
+     * @returns {Promise<string|null>} Path to the video file or null
+     */
+    async getVideoPath() {
+        if (this.page && this.page.video) {
+            try {
+                return await this.page.video().path();
+            } catch (err) {
+                logger.error(`Failed to retrieve video path: ${err.message}`);
+                return null;
+            }
+        }
+        return null;
+    }
+
+    // =========================================================================
+    // MODIFIED: takeScreenshot now returns FILE PATH (not base64)
+    // =========================================================================
+
+    /**
+     * Take a screenshot of the current page and save to disk.
+     * @param {string} name - Name prefix for the screenshot file
+     * @returns {Promise<string|null>} Absolute file path to the saved screenshot
+     */
+    async takeScreenshot(name) {
+        try {
+            if (!this.page) {
+                logger.error("Cannot take screenshot: no active page");
+                return null;
+            }
+            
+            const timestamp = Date.now();
+            const filename = `${name}_${timestamp}.png`;
+            const filepath = path.resolve(this.screenshotPath, filename);
+            
+            await fs.ensureDir(this.screenshotPath);
+            await this.page.screenshot({ path: filepath, fullPage: true });
+            
+            logger.info(`📸 Screenshot saved: ${filepath}`);
+            return filepath;
+        } catch (error) {
+            logger.error(`Failed to capture screenshot: ${error.message}`);
+            return null;
+        }
+    }
+
+    // =========================================================================
+    // LEGACY: Old methods kept for backwards compatibility
+    // =========================================================================
+
     async createContext(options = {}) {
         const contextOptions = {
             viewport: { width: 1280, height: 720 },
@@ -261,24 +420,6 @@ class PlaywrightRunner {
         } finally {
             if (tempPage) await tempPage.close().catch(() => {});
             if (tempContext) await tempContext.close().catch(() => {});
-        }
-    }
-
-    async takeScreenshot(name) {
-        try {
-            const timestamp = Date.now();
-            const filename = `${name}_${timestamp}.png`;
-            const filepath = path.join(this.screenshotPath, filename);
-            
-            await fs.ensureDir(this.screenshotPath);
-            await this.page.screenshot({ path: filepath, fullPage: true });
-            
-            // Return base64 encoded screen capture
-            const base64 = await this.page.screenshot({ encoding: 'base64', fullPage: true });
-            return base64;
-        } catch (error) {
-            logger.error(`Failed to capture screenshot: ${error.message}`);
-            return null;
         }
     }
     
