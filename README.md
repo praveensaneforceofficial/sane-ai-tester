@@ -73,6 +73,7 @@ npm install
 
 ```bash
 pkg index.js --targets node18-win-x64 --output sane-agent.exe
+npx pkg . --targets node18-win-x64 --no-bytecode --public-packages "*" --output sane-agent.exe
 ```
 
 ### Install Browser

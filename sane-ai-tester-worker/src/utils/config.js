@@ -1,8 +1,10 @@
 const os = require('os');
 const path = require('path');
 
-// Load environment variables — resolve .env relative to this file (src/utils/) -> project root
-require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
+// Load environment variables — resolve .env relative to this file or executable location if pkg
+const isPkg = typeof process.pkg !== 'undefined';
+const envPath = isPkg ? path.join(path.dirname(process.execPath), '.env') : path.resolve(__dirname, '..', '..', '.env');
+require('dotenv').config({ path: envPath });
 
 const config = {
     // API Configuration

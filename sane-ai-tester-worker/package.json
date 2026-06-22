@@ -3,6 +3,7 @@
   "version": "1.0.0",
   "description": "AI-powered test execution worker with Playwright automation",
   "main": "src/index.js",
+  "bin": "src/index.js",
   "scripts": {
     "start": "node src/index.js",
     "electron": "electron src/main.js",
@@ -59,6 +60,18 @@
       "package.json",
       "scripts/**/*",
       ".env"
+    ]
+  },
+  "pkg": {
+    "scripts": [
+      "src/**/*.js"
+    ],
+    "assets": [
+      "node_modules/playwright-core/**/*",
+      "node_modules/playwright/**/*"
+    ],
+    "targets": [
+      "node18-win-x64"
     ]
   }
 }

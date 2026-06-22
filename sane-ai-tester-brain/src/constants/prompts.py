@@ -8,8 +8,8 @@ Priority: {priority}
 Project: {project_name}
 
 Special Instructions for UI Flow:
-1. Admin Login & Division Selection: After login, the division selection screen has a default radio button selected. The user only needs to hit 'Enter' to proceed.
-2. Menu Navigation: Clicking any main menu opens a popup. The user must click the sub-menu item inside this popup to navigate.
+1. Admin Login & Division Selection: After admin login, do NOT try to select any radio button. Instead, directly click the "Enter" button. You can target it using `<input type="submit" name="btndash" value="Enter" id="btndash" class="button">` (e.g., `page.click('#btndash')` or `page.locator('input[value="Enter"]').click()`).
+2. Page Navigation: Menu navigation is difficult to interact with. If a target URL path is mentioned in the requirement description (e.g., 'https://dev.saneforce.com/MasterFiles/Common_Doctors/Unique_dr_app_admin.aspx'), instruct the test to navigate directly to that URL instead of clicking through menus.
 Please ensure the generated test cases accurately reflect these interactions.
 
 Generate test cases with:

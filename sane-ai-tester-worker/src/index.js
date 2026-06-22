@@ -4,8 +4,10 @@ const dotenv = require('dotenv');
 const axios = require('axios');
 const path = require('path');
 
-// Resolve .env relative to this file's location (src/) -> parent is project root.
-dotenv.config({ path: path.resolve(__dirname, '..', '.env') });
+// Resolve .env relative to this file's location or the executable location if compiled via pkg
+const isPkg = typeof process.pkg !== 'undefined';
+const envPath = isPkg ? path.join(path.dirname(process.execPath), '.env') : path.resolve(__dirname, '..', '.env');
+dotenv.config({ path: envPath });
 
 const socketClient = require('./network/socketClient');
 const heartbeat = require('./network/heartbeat');

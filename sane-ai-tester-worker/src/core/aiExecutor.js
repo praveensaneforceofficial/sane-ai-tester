@@ -18,14 +18,14 @@ class AIExecutor {
     // =========================================================================
 
     /**
-     * Analyzes the current screenshot + DOM state and returns the next action.
-     * Uses OpenAI Vision API (gpt-4o with image) or Ollama vision model (llava).
+     * Analyzes the current DOM state and returns the next action.
+     * Uses text-based AI models without sending screenshots.
      * 
      * @param {Object} params
      * @param {string} params.objective - The overall test objective/instructions
      * @param {number} params.currentStepNum - Current step number
-     * @param {string} params.screenshotUrl - Public URL of the screenshot (for OpenAI)
-     * @param {string} params.localScreenshotPath - Local file path of screenshot (for Ollama/base64)
+     * @param {string} params.screenshotUrl - (Ignored) Public URL of the screenshot
+     * @param {string} params.localScreenshotPath - (Ignored) Local file path of screenshot
      * @param {string} params.domContext - DOM context string from getCurrentDOM()
      * @param {string|null} params.lastError - Error from the previous step, if any
      * @returns {Promise<{isComplete: boolean, hasError: boolean, errorAnalysis: string, nextPlaywrightCommand: string}>}
@@ -33,18 +33,16 @@ class AIExecutor {
     async analyzeStateAndGetNextStep(params) {
         const { objective, currentStepNum, screenshotUrl, localScreenshotPath, domContext, lastError } = params;
         
-        logger.info(`🧠 AI Vision Analysis — Step ${currentStepNum}...`);
+        logger.info(`🧠 AI State Analysis — Step ${currentStepNum}...`);
 
-        const systemPrompt = `You are a Senior QA Automation Agent with VISION capabilities.
+        const systemPrompt = `You are a Senior QA Automation Agent.
 You are controlling a web browser step-by-step to accomplish a test objective.
-You can SEE the current screenshot of the browser page.
 
 YOUR TASK:
-1. Look at the screenshot carefully.
-2. Read the DOM context provided (available form inputs, buttons, links).
-3. Determine if the objective has been accomplished.
-4. If NOT accomplished, determine the SINGLE NEXT Playwright command to execute.
-5. If you see an application error on the screen (error message, red alert, 404, etc.), report it.
+1. Read the DOM context provided (available form inputs, buttons, links).
+2. Determine if the objective has been accomplished based on the DOM structure.
+3. If NOT accomplished, determine the SINGLE NEXT Playwright command to execute.
+4. If you see an application error in the DOM context (error message, red alert, 404, etc.), report it.
 
 RULES FOR nextPlaywrightCommand:
 - Return EXACTLY ONE Playwright action as raw JavaScript code.
@@ -74,8 +72,8 @@ You MUST respond with ONLY a valid JSON object. No markdown, no backticks, no ex
     "nextPlaywrightCommand": "await page.click('#submit');"
 }
 
-- Set "isComplete": true when the test objective appears to be fully accomplished based on what you see on the screen.
-- Set "hasError": true if you see an application error (NOT a Playwright error) on the screen, and describe it in "errorAnalysis".
+- Set "isComplete": true when the test objective appears to be fully accomplished based on what you see in the DOM.
+- Set "hasError": true if you see an application error (NOT a Playwright error) in the DOM, and describe it in "errorAnalysis".
 - If hasError is true, still provide a nextPlaywrightCommand if possible (e.g., to dismiss the error or retry).
 - If isComplete is true, nextPlaywrightCommand can be empty.`;
 
@@ -87,21 +85,21 @@ You MUST respond with ONLY a valid JSON object. No markdown, no backticks, no ex
         if (domContext) {
             userPrompt += `\nDOM CONTEXT OF CURRENT PAGE:\n${domContext}\n`;
         }
-        userPrompt += `\nAnalyze the attached screenshot and determine the next action to accomplish the objective.`;
+        userPrompt += `\nAnalyze the DOM context and determine the next action to accomplish the objective.`;
 
         try {
             let rawResponse = "";
 
             if (this.aiMode === 'openai' && this.openaiKey) {
-                rawResponse = await this.callOpenAIVision(systemPrompt, userPrompt, screenshotUrl, localScreenshotPath);
+                rawResponse = await this.callOpenAI(systemPrompt, userPrompt);
             } else if (this.aiMode === 'local') {
-                rawResponse = await this.callOllamaVision(systemPrompt, userPrompt, localScreenshotPath);
+                rawResponse = await this.callOllama(systemPrompt + "\n" + userPrompt);
             } else {
                 // Auto-detect: prefer OpenAI if key exists, otherwise Ollama
                 if (this.openaiKey) {
-                    rawResponse = await this.callOpenAIVision(systemPrompt, userPrompt, screenshotUrl, localScreenshotPath);
+                    rawResponse = await this.callOpenAI(systemPrompt, userPrompt);
                 } else {
-                    rawResponse = await this.callOllamaVision(systemPrompt, userPrompt, localScreenshotPath);
+                    rawResponse = await this.callOllama(systemPrompt + "\n" + userPrompt);
                 }
             }
 
