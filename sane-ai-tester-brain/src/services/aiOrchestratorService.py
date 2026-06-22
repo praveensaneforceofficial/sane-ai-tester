@@ -320,6 +320,7 @@ class AIOrchestratorService:
             node_task_id = task.get('task_id')
             if node_task_id:
                 # Retrieve the actual runner task status for self-healing re-assignment
+                already_assigned = True
                 try:
                     node_task = await api_bridge_service.get_task_by_id(node_task_id)
                     if node_task and node_task.get('status') == 'pending':
@@ -339,9 +340,17 @@ class AIOrchestratorService:
                                     url=node_task.get('url'),
                                     prompt=node_task.get('prompt') or task.get('test_instructions')
                                 )
+                    elif node_task and node_task.get('status') in ['completed', 'failed']:
+                        logger.info(f"Previous task {node_task_id} was {node_task.get('status')}. Will create a new execution task.")
+                        already_assigned = False
+                    elif not node_task:
+                        logger.warning(f"Task {node_task_id} not found. Will create a new execution task.")
+                        already_assigned = False
                 except Exception as ex:
                     logger.error(f"Error checking pending runner task {node_task_id}: {ex}")
-                continue # Already assigned
+                
+                if already_assigned:
+                    continue # Already assigned
                 
             title = task.get('title')
             task_id = task.get('custom_task_id')
