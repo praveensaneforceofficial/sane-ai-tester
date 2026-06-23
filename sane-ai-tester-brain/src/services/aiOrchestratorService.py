@@ -256,11 +256,12 @@ class AIOrchestratorService:
                 Task Title: {title}
                 Task Description: {description}
                 
-                Your job is to generate a comprehensive set of step-by-step test cases/scenarios to test this web page (specifying any target URLs or login steps mentioned in the description).
+                Your job is to generate the exact, strict set of step-by-step test instructions required to satisfy the user's objective. 
+                CRITICAL INSTRUCTION: Do NOT hallucinate or add any out-of-scope test cases (like SQL injection, responsive design, negative testing, or extensive edge cases) unless explicitly requested in the Task Description. Keep it as minimal and concise as possible to fulfill the exact user intent.
                 
                 Respond STRICTLY in JSON format with these exact keys:
                 {{
-                    "test_instructions": "clear step-by-step test instructions and possible scenarios string",
+                    "test_instructions": "clear step-by-step test instructions focusing ONLY on the requested scenario",
                     "url": "the extracted test URL string to open"
                 }}
                 """
@@ -341,8 +342,8 @@ class AIOrchestratorService:
                                     prompt=node_task.get('prompt') or task.get('test_instructions')
                                 )
                     elif node_task and node_task.get('status') in ['completed', 'failed']:
-                        logger.info(f"Previous task {node_task_id} was {node_task.get('status')}. Will create a new execution task.")
-                        already_assigned = False
+                        logger.info(f"Previous task {node_task_id} was {node_task.get('status')}. Waiting for report generation.")
+                        already_assigned = True
                     elif not node_task:
                         logger.warning(f"Task {node_task_id} not found. Will create a new execution task.")
                         already_assigned = False

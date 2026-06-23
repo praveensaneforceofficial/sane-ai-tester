@@ -31,7 +31,7 @@ class AIExecutor {
      * @returns {Promise<{isComplete: boolean, hasError: boolean, errorAnalysis: string, nextPlaywrightCommand: string}>}
      */
     async analyzeStateAndGetNextStep(params) {
-        const { objective, currentStepNum, screenshotUrl, localScreenshotPath, domContext, lastError } = params;
+        const { objective, currentStepNum, screenshotUrl, localScreenshotPath, domContext, lastError, previousCommands } = params;
         
         logger.info(`🧠 AI State Analysis — Step ${currentStepNum}...`);
 
@@ -59,6 +59,12 @@ RULES FOR nextPlaywrightCommand:
   try { await page.click('#exact-selector', { timeout: 5000 }); } catch(e) { await page.locator('text=Button Text').click({ force: true }); }
 - CRITICAL FOR DROPDOWNS/HOVER MENUS: If an element only appears when hovering over a card or parent menu, ALWAYS hover first, wait briefly, then click:
   await page.locator('text=Parent Item').hover(); await page.waitForTimeout(500); await page.locator('text=Target Item').click({ force: true });
+- IF A PREVIOUS COMMAND FAILED: **DO NOT repeat the exact same command.**
+  * If the element was "not visible" or "intercepted", try using page.evaluate to force a click via the DOM (e.g. \`await page.evaluate(() => document.querySelector('button:has-text("+ Add New Field")').click())\`).
+  * If it resolved to multiple elements ("strict mode violation"), use a more specific selector, or use \`.first()\`, or \`nth(0)\`.
+- CRITICAL FOR DROPDOWNS AND INPUTS: If standard \`fill()\` or \`selectOption()\` fails or doesn't trigger page updates, simulate a real user using mouse and keyboard:
+  * Dropdowns/Selects: \`await page.locator('select#control').click(); await page.waitForTimeout(500); await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');\` (or type the option text).
+  * Inputs: \`await page.locator('#txtUserName').click(); await page.keyboard.type('admin');\`
 - DO NOT include browser/context initialization code.
 - DO NOT return multiple unrelated steps — return only the immediate next action.
 - Add a brief logger.info() to describe what you're doing.
@@ -79,6 +85,12 @@ You MUST respond with ONLY a valid JSON object. No markdown, no backticks, no ex
 
         let userPrompt = `OBJECTIVE: ${objective}\n`;
         userPrompt += `CURRENT STEP: ${currentStepNum}\n`;
+        
+        if (previousCommands && previousCommands.length > 0) {
+            userPrompt += `\nPAST EXECUTION HISTORY (DO NOT repeat actions that did not change the state!):\n`;
+            userPrompt += previousCommands.slice(-5).join('\n') + `\n`;
+        }
+
         if (lastError) {
             userPrompt += `\n⚠️ PREVIOUS STEP ERROR: ${lastError}\nPlease account for this error and adjust your next action accordingly.\n`;
         }

@@ -60,106 +60,108 @@ class Agent {
                 workerId: this.workerId
             });
 
-            // Initial navigation
-            await this.playwrightRunner.goto(task.url);
-            
             let objective = task.prompt || task.test_instructions || 'Navigate and check page';
-            let isTaskComplete = false;
-            let currentStepNum = 1;
-            let executionLogs = [];
-            let lastErrorAnalysis = null;
-            const MAX_STEPS = 50; // Circuit breaker to prevent infinite AI loops
+            // Prepend URL to objective if not present
+            if (!objective.includes(task.url)) {
+                objective = `Navigate to ${task.url}\n${objective}`;
+            }
 
-            // Main Interactive Loop
-            while (!isTaskComplete && currentStepNum <= MAX_STEPS) {
-                logger.info(`📍 --- Processing Step/Level ${currentStepNum} ---`);
+            logger.info(`🤖 Starting browser-use Python Agent for objective: ${objective}`);
+            
+            const { spawn } = require('child_process');
+            const path = require('path');
+            
+            const pythonExe = path.join(__dirname, '..', '..', '.venv', 'Scripts', 'python.exe');
+            const scriptPath = path.join(__dirname, '..', '..', 'run_browser_use.py');
+            
+            resultData = await new Promise((resolve, reject) => {
+                const pyProc = spawn(pythonExe, [scriptPath, objective]);
                 
-                // 1. Capture the current state (Screenshot + DOM)
-                const screenshotPath = await this.playwrightRunner.takeScreenshot(`step_${currentStepNum}`);
+                let outputData = '';
+                let errorData = '';
                 
-                if (!screenshotPath) {
-                    throw new Error(`Screenshot capture failed at step ${currentStepNum}. The browser or page may have been closed.`);
-                }
-
-                let domContext = "";
-                try {
-                    domContext = await this.playwrightRunner.getCurrentDOM();
-                } catch (e) {
-                    logger.warn(`Could not fetch DOM: ${e.message}`);
-                }
-
-                // 2. Upload screenshot to R2 so AI (or central server) can access via URL if needed
-                const publicScreenshotUrl = await s3Service.uploadFile(screenshotPath);
-
-                // 3. Ask AI to analyze the screenshot + state
-                // The AI determines if there's an error, and returns either the next command OR a fix.
-                logger.info(`🧠 Sending screenshot to AI for validation and next instruction...`);
-                const aiResponse = await this.aiExecutor.analyzeStateAndGetNextStep({
-                    objective,
-                    currentStepNum,
-                    screenshotUrl: publicScreenshotUrl,
-                    localScreenshotPath: screenshotPath, // alternative if using local base64
-                    domContext,
-                    lastError: lastErrorAnalysis
+                pyProc.stdout.on('data', (data) => {
+                    outputData += data.toString();
+                    logger.info(`[browser-use] ${data.toString().trim()}`);
                 });
-
-                // Expecting aiResponse structure: 
-                // { isComplete: boolean, hasError: boolean, errorAnalysis: string, nextPlaywrightCommand: string }
                 
-                if (aiResponse.isComplete) {
-                    logger.info(`🎉 AI declared objective accomplished at step ${currentStepNum}!`);
-                    isTaskComplete = true;
-                    resultData.status = 'completed';
-                    break;
-                }
+                pyProc.stderr.on('data', (data) => {
+                    errorData += data.toString();
+                    logger.warn(`[browser-use log] ${data.toString().trim()}`);
+                });
+                
+                pyProc.on('close', async (code) => {
+                    logger.info(`🤖 browser-use exited with code ${code}`);
+                    try {
+                        let videoUrl = null;
+                        if (this.enableRecording) {
+                            try {
+                                const videoDir = config.VIDEO_PATH;
+                                if (await fs.pathExists(videoDir)) {
+                                    const files = await fs.readdir(videoDir);
+                                    const webmFiles = files.filter(f => f.endsWith('.webm') || f.endsWith('.mp4'));
+                                    if (webmFiles.length > 0) {
+                                        let latestFile = null;
+                                        let latestTime = 0;
+                                        for (const file of webmFiles) {
+                                            const fullPath = path.join(videoDir, file);
+                                            const stat = await fs.stat(fullPath);
+                                            if (stat.mtimeMs > latestTime && stat.mtimeMs >= startTime) {
+                                                latestTime = stat.mtimeMs;
+                                                latestFile = fullPath;
+                                            }
+                                        }
+                                        if (latestFile) {
+                                            logger.info(`🎥 Found video recording: ${latestFile}. Uploading to R2/S3...`);
+                                            videoUrl = await s3Service.uploadFile(latestFile);
+                                        }
+                                    }
+                                }
+                            } catch (err) {
+                                logger.error(`❌ Error finding/uploading video: ${err.message}`);
+                            }
+                        }
 
-                if (aiResponse.hasError) {
-                    logger.warn(`⚠️ AI Detected an error on the screen: ${aiResponse.errorAnalysis}`);
-                    lastErrorAnalysis = aiResponse.errorAnalysis;
-                    
-                    // Emit error back to Server/SI immediately from this exact point
-                    this.socket.emit('worker:task:step_error', {
-                        taskId: task.taskId || task.id,
-                        step: currentStepNum,
-                        errorAnalysis: aiResponse.errorAnalysis,
-                        screenshotUrl: publicScreenshotUrl
-                    });
-                } else {
-                    // Clear error context if current step looks clean
-                    lastErrorAnalysis = null; 
-                }
-
-                // 4. Execute the single instruction given by the AI from this specific point
-                if (aiResponse.nextPlaywrightCommand) {
-                    logger.info(`⚡ Executing AI Instruction: ${aiResponse.nextPlaywrightCommand}`);
-                    const stepResult = await this.playwrightRunner.executeSingleCommand(aiResponse.nextPlaywrightCommand);
-                    
-                    executionLogs.push(`Step ${currentStepNum}: ${aiResponse.nextPlaywrightCommand} -> Success: ${stepResult.success}`);
-                    
-                    if (!stepResult.success) {
-                        // Infrastructure/Playwright code level execution crash
-                        lastErrorAnalysis = `Playwright Execution Failed: ${stepResult.error}`;
+                        // Find the JSON block in the output
+                        const lines = outputData.split('\n');
+                        let parsed = null;
+                        for (let line of lines.reverse()) {
+                            try {
+                                parsed = JSON.parse(line);
+                                break;
+                            } catch (e) {}
+                        }
+                        
+                        if (parsed) {
+                            resolve({
+                                status: parsed.success ? 'completed' : 'failed',
+                                screenshotUrl: null,
+                                videoUrl: videoUrl,
+                                error: parsed.error || null,
+                                data: null,
+                                summary: parsed.result || 'Execution finished',
+                                duration: Date.now() - startTime
+                            });
+                        } else {
+                            resolve({
+                                status: 'failed',
+                                screenshotUrl: null,
+                                videoUrl: videoUrl,
+                                error: errorData || 'No JSON output from python script',
+                                data: null,
+                                summary: 'Execution failed or crashed',
+                                duration: Date.now() - startTime
+                            });
+                        }
+                    } catch (err) {
+                        resolve({
+                            status: 'failed',
+                            error: 'Failed to parse python output: ' + err.message,
+                            duration: Date.now() - startTime
+                        });
                     }
-                }
-
-                currentStepNum++;
-            }
-
-            if (currentStepNum > MAX_STEPS && !isTaskComplete) {
-                throw new Error(`Task stopped: Reached maximum step limit of ${MAX_STEPS}`);
-            }
-
-            // Generate Summary based on step history
-            const summary = await this.aiExecutor.generateSummary(objective, executionLogs.join('\n'), resultData.status === 'completed');
-            resultData.summary = summary;
-
-            // Handle optional video upload
-            if (this.enableRecording) {
-                const videoPath = await this.playwrightRunner.getVideoPath();
-                if (videoPath) {
-                    resultData.videoUrl = await s3Service.uploadFile(videoPath);
-                }
-            }
+                });
+            });
 
             this.socket.emit('worker:task:complete', {
                 taskId: task.taskId || task.id,

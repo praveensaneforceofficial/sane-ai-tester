@@ -26,6 +26,8 @@ class TestPlanner:
             Description: {requirement.get('description', '')}
             Priority: {requirement.get('priority', 'Medium')}
             
+            CRITICAL INSTRUCTION: Generate ONLY the test cases explicitly needed to verify the description. Do NOT add out-of-scope scenarios (like SQL injection, responsive testing, or unrelated edge cases) unless the description specifically asks for them. Keep the test cases minimal and directly relevant.
+            
             Return only valid JSON in this format:
             [
               {{"title": "Test name", "steps": ["step 1", "step 2"], "expected_result": "result"}}
